@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::env;
 use std::fs;
 use std::io::{self, Write};
@@ -19,7 +20,11 @@ fn main() {
                 String::new()
             });
 
-            tokenize(&file_contents);
+            let lexer = Lexer::new(&file_contents);
+            for token in lexer {
+                println!("{}", token);
+            }
+            println!("EOF  null");
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
@@ -28,13 +33,51 @@ fn main() {
     }
 }
 
-fn tokenize(input: &str) {
-    for c in input.chars() {
-        match c {
-            '(' => println!("LEFT_PAREN ( null"),
-            ')' => println!("RIGHT_PAREN ) null"),
-            _ => {},   // ignore for now
+pub enum Token {
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Token::LeftParen    => write!(f, "LEFT_PAREN ( null"),
+            Token::RightParen   => write!(f, "RIGHT_PAREN ) null"),
+            Token::LeftBrace    => write!(f, "LEFT_BRACE {{ null"),
+            Token::RightBrace   => write!(f, "RIGHT_BRACE }} null"),
         }
     }
-    println!("EOF  null");
+}
+
+pub struct Lexer<'a> {
+    rest: &'a str,
+}
+
+impl<'a> Lexer<'a> {
+    pub fn new(input: &'a str) -> Self {
+        Lexer { rest: input }
+    }
+}
+
+impl Iterator for Lexer<'_> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Token> {
+        let c = self.rest.chars().next()?;
+        self.rest = &self.rest[1..];
+
+        let tok = match c {
+            '(' => Token::LeftParen,
+            ')' => Token::RightParen,
+            '{' => Token::LeftBrace,
+            '}' => Token::RightBrace,
+            _ => {
+                return None;
+            },
+        };
+
+        Some(tok)
+    }
 }
