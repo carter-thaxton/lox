@@ -99,9 +99,19 @@ pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
         }
 
         Expr::BinaryExpr { op: Op::Add, left, right } => {
-            let left = evaluate_to_number(left)?;
-            let right = evaluate_to_number(right)?;
-            Ok(Value::Number(left + right))
+            let left = evaluate(left)?;
+            let right = evaluate(right)?;
+            match (left, right) {
+                (Value::Number(left), Value::Number(right)) => {
+                    Ok(Value::Number(left + right))
+                }
+                (Value::String(left), Value::String(right)) => {
+                    let mut result = left;
+                    result.push_str(&right);
+                    Ok(Value::String(result))
+                }
+                _ => Err(Error::runtime_error("Operands must be two numbers or two strings."))
+            }
         }
 
         Expr::BinaryExpr { op: Op::Sub, left, right } => {
