@@ -30,7 +30,7 @@ fn main() {
             let lexer = Lexer::new(&file_contents);
             for result in lexer {
                 match result {
-                    Ok((token, _line)) => {
+                    Ok(token) => {
                         println!("{}", token);
                     }
                     Err(err) => {

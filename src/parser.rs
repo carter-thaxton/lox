@@ -14,17 +14,16 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(mut self) -> Result<AstNode, Error> {
+    pub fn parse(mut self) -> Result<AstNode, Error<'a>> {
         let expr = self.parse_expr()?;
-
         Ok(AstNode::Expr(expr))
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, Error> {
+    fn parse_expr(&mut self) -> Result<Expr, Error<'a>> {
         self.parse_equality()
     }
 
-    fn parse_equality(&mut self) -> Result<Expr, Error> {
+    fn parse_equality(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_comparison()?;
 
         while let Some(tok) = self.matches_n(&[TokenKind::EqualEqual, TokenKind::BangEqual]) {
@@ -34,16 +33,25 @@ impl<'a> Parser<'a> {
                 _ => unreachable!(),
             };
             let right = self.parse_comparison()?;
-            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinaryExpr {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
 
         Ok(left)
     }
 
-    fn parse_comparison(&mut self) -> Result<Expr, Error> {
+    fn parse_comparison(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_term()?;
 
-        while let Some(tok) = self.matches_n(&[TokenKind::Less, TokenKind::LessEqual, TokenKind::Greater, TokenKind::GreaterEqual]) {
+        while let Some(tok) = self.matches_n(&[
+            TokenKind::Less,
+            TokenKind::LessEqual,
+            TokenKind::Greater,
+            TokenKind::GreaterEqual,
+        ]) {
             let op = match tok {
                 TokenKind::Less => Op::Lt,
                 TokenKind::LessEqual => Op::Le,
@@ -52,13 +60,17 @@ impl<'a> Parser<'a> {
                 _ => unreachable!(),
             };
             let right = self.parse_term()?;
-            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinaryExpr {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
 
         Ok(left)
     }
 
-    fn parse_term(&mut self) -> Result<Expr, Error> {
+    fn parse_term(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_factor()?;
 
         while let Some(tok) = self.matches_n(&[TokenKind::Plus, TokenKind::Minus]) {
@@ -68,13 +80,17 @@ impl<'a> Parser<'a> {
                 _ => unreachable!(),
             };
             let right = self.parse_factor()?;
-            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinaryExpr {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
 
         Ok(left)
     }
 
-    fn parse_factor(&mut self) -> Result<Expr, Error> {
+    fn parse_factor(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_unary()?;
 
         while let Some(tok) = self.matches_n(&[TokenKind::Star, TokenKind::Slash]) {
@@ -84,26 +100,36 @@ impl<'a> Parser<'a> {
                 _ => unreachable!(),
             };
             let right = self.parse_unary()?;
-            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinaryExpr {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
 
         Ok(left)
     }
 
-    fn parse_unary(&mut self) -> Result<Expr, Error> {
+    fn parse_unary(&mut self) -> Result<Expr, Error<'a>> {
         if self.matches(TokenKind::Minus).is_some() {
             let right = self.parse_unary()?;
-            return Ok(Expr::UnaryExpr { op: Op::Neg, right: Box::new(right) });
+            return Ok(Expr::UnaryExpr {
+                op: Op::Neg,
+                right: Box::new(right),
+            });
         }
         if self.matches(TokenKind::Bang).is_some() {
             let right = self.parse_unary()?;
-            return Ok(Expr::UnaryExpr { op: Op::Not, right: Box::new(right) });
+            return Ok(Expr::UnaryExpr {
+                op: Op::Not,
+                right: Box::new(right),
+            });
         }
 
         self.parse_primary()
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, Error> {
+    fn parse_primary(&mut self) -> Result<Expr, Error<'a>> {
         if self.matches(TokenKind::Nil).is_some() {
             return Ok(Expr::Literal(Literal::Nil));
         }
@@ -115,16 +141,17 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(Ok(tok)) = self.peek() {
-            match *tok {
-                TokenKind::String(val, _) => {
+            match tok.clone() {
+                // TODO: can we avoid this?
+                TokenKind::String(val) => {
                     self.advance();
-                    return Ok(Expr::Literal(Literal::String(val.to_owned())));
+                    return Ok(Expr::Literal(Literal::String(val.to_string())));
                 }
-                TokenKind::Number(val, _) => {
+                TokenKind::Number(val) => {
                     self.advance();
                     return Ok(Expr::Literal(Literal::Number(val)));
                 }
-                _ => {},
+                _ => {}
             }
         }
 
@@ -134,16 +161,12 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Group(Box::new(expr)));
         }
 
-        Err(self.parse_error("Expect expression."))
+        Err(self.parser_error("Expect expression."))
     }
 
-    fn parse_error(&mut self, message: &str) -> Error {
-        let line = self.peek_line().expect("Should not be at EOF");
-        let next_token = match self.peek() {
-            Some(Ok(tok)) => Some(tok),
-            _ => None,
-        };
-        Error::parser_error(line, next_token, message)
+    fn parser_error(&mut self, message: &str) -> Error<'a> {
+        let span = self.peek_span().expect("Should not be at EOF").clone();
+        Error::parser_error(span, message)
     }
 
     fn advance(&mut self) -> TokenKind<'_> {
@@ -151,21 +174,21 @@ impl<'a> Parser<'a> {
             .next()
             .expect("Should not be at EOF")
             .expect("Should not produce a lexer error")
-            .0
+            .kind
     }
 
-    fn peek(&mut self) -> Option<Result<&TokenKind<'a>, &Error>> {
+    fn peek(&mut self) -> Option<Result<&TokenKind<'a>, &Error<'a>>> {
         match self.lexer.peek() {
-            Some(Ok((token, _line))) => Some(Ok(token)),
+            Some(Ok(token)) => Some(Ok(&token.kind)),
             Some(Err(err)) => Some(Err(err)),
             None => None,
         }
     }
 
-    fn peek_line(&mut self) -> Option<usize> {
+    fn peek_span(&mut self) -> Option<&Span<'a>> {
         match self.lexer.peek() {
-            Some(Ok((_token, line))) => Some(*line),
-            Some(Err(err)) => Some(err.line),
+            Some(Ok(token)) => Some(&token.span),
+            Some(Err(err)) => Some(&err.span),
             None => None,
         }
     }
@@ -182,7 +205,7 @@ impl<'a> Parser<'a> {
     fn check_n(&mut self, tokens: &[TokenKind<'_>]) -> bool {
         if let Some(Ok(tok)) = self.peek() {
             if tokens.contains(tok) {
-                return true
+                return true;
             }
         }
         false
@@ -227,7 +250,7 @@ impl<'a> Parser<'a> {
     //     }
     // }
 
-    fn expect(&mut self, token: TokenKind<'_>) -> Result<(), Error> {
+    fn expect(&mut self, token: TokenKind<'_>) -> Result<(), Error<'a>> {
         if self.check(token) {
             self.advance();
             Ok(())
@@ -317,7 +340,7 @@ impl Display for Literal {
                 }
             }
             Literal::String(s) => {
-                write!(f, "{}", s)  // very bad format for literals.  should be quoted ""
+                write!(f, "{}", s) // very bad format for literals.  should be quoted ""
             }
         }
     }

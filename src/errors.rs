@@ -1,11 +1,11 @@
+use crate::lexer::Span;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
-use crate::lexer::TokenKind;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Error {
-    pub line: usize,
+pub struct Error<'a> {
     pub kind: ErrorKind,
+    pub span: Span<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -13,15 +13,15 @@ pub enum ErrorKind {
     UnexpectedCharacter(char),
     UnterminatedString,
     InvalidNumber(String),
-    ParserError(Option<String>, String),
+    ParserError(String),
 }
 
-impl Display for Error {
+impl Display for Error<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
             "[line {}] Error{}: {}",
-            self.line,
+            self.span.line,
             self.at_message(),
             self.kind
         )
@@ -40,53 +40,55 @@ impl Display for ErrorKind {
             ErrorKind::InvalidNumber(s) => {
                 write!(f, "Invalid number: {}", s)
             }
-            ErrorKind::ParserError(_, msg) => {
+            ErrorKind::ParserError(msg) => {
                 write!(f, "{}", msg)
             }
         }
     }
 }
 
-impl Error {
-    pub fn unexpected_character(line: usize, ch: char) -> Self {
+impl<'a> Error<'a> {
+    pub fn unexpected_character(span: Span<'a>) -> Self {
+        let ch = span.lexeme.chars().next().expect("Should not be at EOF");
         Error {
-            line,
             kind: ErrorKind::UnexpectedCharacter(ch),
+            span,
         }
     }
 
-    pub fn unterminated_string(line: usize) -> Self {
+    pub fn unterminated_string(span: Span<'a>) -> Self {
         Error {
-            line,
             kind: ErrorKind::UnterminatedString,
+            span,
         }
     }
 
-    pub fn invalid_number(line: usize, s: &str) -> Self {
+    pub fn invalid_number(span: Span<'a>) -> Self {
         Error {
-            line,
-            kind: ErrorKind::InvalidNumber(s.to_owned()),
+            kind: ErrorKind::InvalidNumber(span.lexeme.to_string()),
+            span,
         }
     }
 
-    pub fn parser_error(line: usize, token: Option<&TokenKind<'_>>, message: &str) -> Self {
-        let lexeme = token.map(|t| t.lexeme().to_owned());
+    pub fn parser_error(span: Span<'a>, message: &str) -> Self {
         Error {
-            line,
-            kind: ErrorKind::ParserError(lexeme, message.to_owned()),
+            kind: ErrorKind::ParserError(message.to_owned()),
+            span: span,
         }
     }
 
     fn at_message(&self) -> Cow<str> {
-        let lexeme = match &self.kind {
-            ErrorKind::ParserError(lexeme, _msg) => lexeme,
-            _ => { return "".into(); },
+        let span = match &self.kind {
+            ErrorKind::ParserError(_) => self.span,
+            _ => {
+                return "".into();
+            }
         };
 
-        if let Some(lexeme) = lexeme {
-            format!(" at '{}'", lexeme).into()
-        } else {
+        if span.lexeme.is_empty() {
             " at end".into()
+        } else {
+            format!(" at '{}'", span.lexeme).into()
         }
     }
 }

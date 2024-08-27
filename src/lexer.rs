@@ -2,21 +2,20 @@ use crate::errors::*;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
-// #[derive(Debug, Clone, Copy, PartialEq)]
-// pub struct Token<'a> {
-//     kind: TokenKind<'a>,
-//     span: Span,
-// }
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Span {
-    line: usize,
-    col: usize,
-    pos: usize,
-    len: usize,
+#[derive(Debug, Clone, PartialEq)]
+pub struct Token<'a> {
+    pub kind: TokenKind<'a>,
+    pub span: Span<'a>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Span<'a> {
+    pub line: usize,
+    pub col: usize,
+    pub lexeme: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind<'a> {
     LeftParen,
     RightParen,
@@ -38,8 +37,8 @@ pub enum TokenKind<'a> {
     GreaterEqual,
     Slash,
 
-    String(&'a str, &'a str),
-    Number(f64, &'a str),
+    String(Cow<'a, str>),
+    Number(f64),
     Identifier(&'a str),
 
     // keywords
@@ -61,9 +60,9 @@ pub enum TokenKind<'a> {
     While,
 }
 
-impl Display for TokenKind<'_> {
+impl Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{} {} {}", self.name(), self.lexeme(), self.value())
+        write!(f, "{} {} {}", self.kind.name(), self.span.lexeme, self.kind.value())
     }
 }
 
@@ -90,8 +89,8 @@ impl TokenKind<'_> {
             TokenKind::Greater          => "GREATER",
             TokenKind::GreaterEqual     => "GREATER_EQUAL",
             TokenKind::Slash            => "SLASH",
-            TokenKind::String(_, _)     => "STRING",
-            TokenKind::Number(_, _)     => "NUMBER",
+            TokenKind::String(_)        => "STRING",
+            TokenKind::Number(_)        => "NUMBER",
             TokenKind::Identifier(_)    => "IDENTIFIER",
             TokenKind::And              => "AND",
             TokenKind::Class            => "CLASS",
@@ -112,60 +111,16 @@ impl TokenKind<'_> {
         }
     }
 
-    #[rustfmt::skip]
-    pub fn lexeme(&self) -> &str {
-        match self {
-            TokenKind::LeftParen        => "(",
-            TokenKind::RightParen       => ")",
-            TokenKind::LeftBrace        => "{",
-            TokenKind::RightBrace       => "}",
-            TokenKind::Comma            => ",",
-            TokenKind::Dot              => ".",
-            TokenKind::Minus            => "-",
-            TokenKind::Plus             => "+",
-            TokenKind::Semicolon        => ";",
-            TokenKind::Star             => "*",
-            TokenKind::Equal            => "=",
-            TokenKind::EqualEqual       => "==",
-            TokenKind::Bang             => "!",
-            TokenKind::BangEqual        => "!=",
-            TokenKind::Less             => "<",
-            TokenKind::LessEqual        => "<=",
-            TokenKind::Greater          => ">",
-            TokenKind::GreaterEqual     => ">=",
-            TokenKind::Slash            => "/",
-            TokenKind::Number(_, s)     => s,
-            TokenKind::Identifier(s)    => s,
-            TokenKind::String(_, s)     => s,
-            TokenKind::And              => "and",
-            TokenKind::Class            => "class",
-            TokenKind::Else             => "else",
-            TokenKind::False            => "false",
-            TokenKind::For              => "for",
-            TokenKind::Fun              => "fun",
-            TokenKind::If               => "if",
-            TokenKind::Nil              => "nil",
-            TokenKind::Or               => "or",
-            TokenKind::Print            => "print",
-            TokenKind::Return           => "return",
-            TokenKind::Super            => "super",
-            TokenKind::This             => "this",
-            TokenKind::True             => "true",
-            TokenKind::Var              => "var",
-            TokenKind::While            => "while",
-        }
-    }
-
     pub fn value(&self) -> Cow<str> {
         match self {
-            TokenKind::Number(val, _) => {
+            TokenKind::Number(val) => {
                 if *val == val.trunc() && !val.is_infinite() && !val.is_nan() {
                     format!("{}.0", val).into()
                 } else {
                     format!("{}", val).into()
                 }
             }
-            TokenKind::String(val, _) => Cow::Borrowed(val),
+            TokenKind::String(val) => Cow::Borrowed(val),
             _ => "null".into(),
         }
     }
@@ -173,24 +128,49 @@ impl TokenKind<'_> {
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
+    _input: &'a str,
     rest: &'a str,
     line: usize,
+    col: usize,
+    pos: usize,
+
+    lexeme_start: &'a str,
+    lexeme_line: usize,
+    lexeme_col: usize,
+    lexeme_len: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Lexer {
+            _input: input,
             rest: input,
             line: 1,
+            col: 0,
+            pos: 0,
+
+            lexeme_start: input,
+            lexeme_line: 0,
+            lexeme_col: 0,
+            lexeme_len: 0,
         }
     }
+
+    // fn at_eof(&self) -> bool {
+    //     self.rest.is_empty()
+    // }
 
     fn advance(&mut self) -> Option<char> {
         let mut chars = self.rest.chars();
         let c = chars.next()?;
+        let len = c.len_utf8();
         self.rest = chars.as_str();
+        self.col += len;
+        self.pos += len;
+        self.lexeme_len += len;
         if c == '\n' {
             self.line += 1;
+            self.col = 0;
         }
         Some(c)
     }
@@ -204,57 +184,92 @@ impl<'a> Lexer<'a> {
         chars.next()?;
         chars.next()
     }
+
+    fn start_lexeme(&mut self) -> Span<'a> {
+        // returns span for next char, appropriate for errors during lexing
+        let next_char_len = match self.peek() {
+            Some(c) => c.len_utf8(),
+            None => 0,
+        };
+
+        self.lexeme_start = self.rest;
+        self.lexeme_line = self.line;
+        self.lexeme_col = self.col;
+        self.lexeme_len = 0;
+
+        Span {
+            line: self.line,
+            col: self.col,
+            lexeme: &self.rest[..next_char_len],
+        }
+    }
+
+    fn end_lexeme(&mut self) -> Span<'a> {
+        // returns span for string since calling start_lexeme
+        let result = Span {
+            line: self.lexeme_line,
+            col: self.lexeme_col,
+            lexeme: &self.lexeme_start[..self.lexeme_len],
+        };
+
+        self.lexeme_start = self.rest;
+        self.lexeme_line = 0;
+        self.lexeme_col = 0;
+        self.lexeme_len = 0;
+
+        result
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<(TokenKind<'a>, usize), Error>;
+    type Item = Result<Token<'a>, Error<'a>>;
 
-    fn next(&mut self) -> Option<Result<(TokenKind<'a>, usize), Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let s = self.rest;
+            let span = self.start_lexeme();
             let c = self.advance()?;
 
-            let tok = match c {
-                '(' => TokenKind::LeftParen,
-                ')' => TokenKind::RightParen,
-                '{' => TokenKind::LeftBrace,
-                '}' => TokenKind::RightBrace,
-                ',' => TokenKind::Comma,
-                '.' => TokenKind::Dot,
-                '-' => TokenKind::Minus,
-                '+' => TokenKind::Plus,
-                ';' => TokenKind::Semicolon,
-                '*' => TokenKind::Star,
+            let (kind, span) = match c {
+                '(' => (TokenKind::LeftParen, self.end_lexeme()),
+                ')' => (TokenKind::RightParen, self.end_lexeme()),
+                '{' => (TokenKind::LeftBrace, self.end_lexeme()),
+                '}' => (TokenKind::RightBrace, self.end_lexeme()),
+                ',' => (TokenKind::Comma, self.end_lexeme()),
+                '.' => (TokenKind::Dot, self.end_lexeme()),
+                '-' => (TokenKind::Minus, self.end_lexeme()),
+                '+' => (TokenKind::Plus, self.end_lexeme()),
+                ';' => (TokenKind::Semicolon, self.end_lexeme()),
+                '*' => (TokenKind::Star, self.end_lexeme()),
                 '=' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        TokenKind::EqualEqual
+                        (TokenKind::EqualEqual, self.end_lexeme())
                     } else {
-                        TokenKind::Equal
+                        (TokenKind::Equal, self.end_lexeme())
                     }
                 }
                 '!' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        TokenKind::BangEqual
+                        (TokenKind::BangEqual, self.end_lexeme())
                     } else {
-                        TokenKind::Bang
+                        (TokenKind::Bang, self.end_lexeme())
                     }
                 }
                 '<' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        TokenKind::LessEqual
+                        (TokenKind::LessEqual, self.end_lexeme())
                     } else {
-                        TokenKind::Less
+                        (TokenKind::Less, self.end_lexeme())
                     }
                 }
                 '>' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        TokenKind::GreaterEqual
+                        (TokenKind::GreaterEqual, self.end_lexeme())
                     } else {
-                        TokenKind::Greater
+                        (TokenKind::Greater, self.end_lexeme())
                     }
                 }
                 '/' => {
@@ -264,74 +279,63 @@ impl<'a> Iterator for Lexer<'a> {
                                 break;
                             }
                         }
-                        continue;
+                        continue; // ignore, and restart next lexeme
                     } else {
-                        TokenKind::Slash
+                        (TokenKind::Slash, self.end_lexeme())
                     }
                 }
                 ' ' | '\t' | '\r' | '\n' => {
-                    continue;
+                    continue; // ignore, and restart next lexeme
                 }
-                '"' => {
-                    let line = self.line;
-                    let mut len = 1;
-                    loop {
-                        let Some(c) = self.advance() else {
-                            return Some(Err(Error::unterminated_string(line)));
-                        };
-                        len += c.len_utf8();
-                        if c != '"' {
-                            continue;
-                        }
-                        let lexeme = &s[..len];
-                        let val = &s[1..len - 1];
-                        break TokenKind::String(val, lexeme);
+                '"' => loop {
+                    let Some(c) = self.advance() else {
+                        return Some(Err(Error::unterminated_string(span)));
+                    };
+                    if c != '"' {
+                        continue;
                     }
-                }
+                    let span = self.end_lexeme();
+                    let val = &span.lexeme[1..span.lexeme.len() - 1];
+                    break (TokenKind::String(Cow::Borrowed(val)), span);
+                },
                 '0'..='9' => {
-                    let mut len = 1;
                     while let Some(c) = self.peek() {
                         if !c.is_digit(10) {
                             break;
                         }
-                        len += c.len_utf8();
                         self.advance();
                     }
 
                     if self.peek() == Some('.') && self.peek_next().is_some_and(|c| c.is_digit(10))
                     {
                         self.advance(); // dot
-                        len += 1;
 
                         while let Some(c) = self.peek() {
                             if !c.is_digit(10) {
                                 break;
                             }
-                            len += c.len_utf8();
                             self.advance();
                         }
                     }
 
-                    let lexeme = &s[..len];
-                    let val: f64 = match lexeme.parse() {
+                    let span = self.end_lexeme();
+                    let val: f64 = match span.lexeme.parse() {
                         Ok(val) => val,
                         Err(_) => {
-                            return Some(Err(Error::invalid_number(self.line, lexeme)));
+                            return Some(Err(Error::invalid_number(span)));
                         }
                     };
-                    TokenKind::Number(val, lexeme)
+                    (TokenKind::Number(val), span)
                 }
                 #[rustfmt::skip]
                 'A'..='Z' | 'a'..='z' | '_' => {
-                    let mut len = 1;
                     while let Some(c) = self.peek() {
                         if !matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_') { break }
-                        len += c.len_utf8();
                         self.advance();
                     }
-                    let lexeme = &s[..len];
+                    let span = self.end_lexeme();
 
-                    match lexeme {
+                    let kind = match span.lexeme {
                         "and"       => TokenKind::And,
                         "class"     => TokenKind::Class,
                         "else"      => TokenKind::Else,
@@ -348,15 +352,17 @@ impl<'a> Iterator for Lexer<'a> {
                         "true"      => TokenKind::True,
                         "var"       => TokenKind::Var,
                         "while"     => TokenKind::While,
-                        _           => TokenKind::Identifier(lexeme),
-                    }
+                        _           => TokenKind::Identifier(span.lexeme),
+                    };
+
+                    (kind, span)
                 }
                 _ => {
-                    return Some(Err(Error::unexpected_character(self.line, c)));
+                    return Some(Err(Error::unexpected_character(span)));
                 }
             };
 
-            return Some(Ok((tok, self.line)));
+            return Some(Ok(Token { kind, span }));
         }
     }
 }
