@@ -7,7 +7,7 @@ pub mod lexer;
 pub mod parser;
 
 use lexer::Lexer;
-use parser::parse;
+use parser::Parser;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -51,9 +51,9 @@ fn main() {
                 String::new()
             });
 
-            let result = parse(Lexer::new(&file_contents));
+            let parser = Parser::new(&file_contents);
 
-            match result {
+            match parser.parse() {
                 Ok(ast) => {
                     println!("{}", ast);
                 }
