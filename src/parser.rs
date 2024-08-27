@@ -21,8 +21,41 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Result<Expr, Error> {
-        // TODO: handle the full hierarchy of precedence
-        self.parse_term()
+        self.parse_equality()
+    }
+
+    fn parse_equality(&mut self) -> Result<Expr, Error> {
+        let mut left = self.parse_comparison()?;
+
+        while let Some(tok) = self.matches_n(&[Token::EqualEqual, Token::BangEqual]) {
+            let op = match tok {
+                Token::EqualEqual => Op::Eq,
+                Token::BangEqual => Op::Ne,
+                _ => unreachable!(),
+            };
+            let right = self.parse_comparison()?;
+            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_comparison(&mut self) -> Result<Expr, Error> {
+        let mut left = self.parse_term()?;
+
+        while let Some(tok) = self.matches_n(&[Token::Less, Token::LessEqual, Token::Greater, Token::GreaterEqual]) {
+            let op = match tok {
+                Token::Less => Op::Lt,
+                Token::LessEqual => Op::Le,
+                Token::Greater => Op::Gt,
+                Token::GreaterEqual => Op::Ge,
+                _ => unreachable!(),
+            };
+            let right = self.parse_term()?;
+            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+        }
+
+        Ok(left)
     }
 
     fn parse_term(&mut self) -> Result<Expr, Error> {
