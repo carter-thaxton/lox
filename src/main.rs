@@ -68,39 +68,41 @@ pub enum Token<'a> {
     GreaterEqual,
     Slash,
     String(&'a str),
-    Number(f64, &'a str)
+    Number(f64, &'a str),
+    Identifier(&'a str),
 }
 
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Token::LeftParen    => write!(f, "LEFT_PAREN ( null"),
-            Token::RightParen   => write!(f, "RIGHT_PAREN ) null"),
-            Token::LeftBrace    => write!(f, "LEFT_BRACE {{ null"),
-            Token::RightBrace   => write!(f, "RIGHT_BRACE }} null"),
-            Token::Comma        => write!(f, "COMMA , null"),
-            Token::Dot          => write!(f, "DOT . null"),
-            Token::Minus        => write!(f, "MINUS - null"),
-            Token::Plus         => write!(f, "PLUS + null"),
-            Token::Semicolon    => write!(f, "SEMICOLON ; null"),
-            Token::Star         => write!(f, "STAR * null"),
-            Token::Equal        => write!(f, "EQUAL = null"),
-            Token::EqualEqual   => write!(f, "EQUAL_EQUAL == null"),
-            Token::Bang         => write!(f, "BANG ! null"),
-            Token::BangEqual    => write!(f, "BANG_EQUAL != null"),
-            Token::Less         => write!(f, "LESS < null"),
-            Token::LessEqual    => write!(f, "LESS_EQUAL <= null"),
-            Token::Greater      => write!(f, "GREATER > null"),
-            Token::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
-            Token::Slash        => write!(f, "SLASH / null"),
-            Token::String(s)    => write!(f, "STRING \"{}\" {}", s, s),
-            Token::Number(n, s) => {
+            Token::LeftParen        => write!(f, "LEFT_PAREN ( null"),
+            Token::RightParen       => write!(f, "RIGHT_PAREN ) null"),
+            Token::LeftBrace        => write!(f, "LEFT_BRACE {{ null"),
+            Token::RightBrace       => write!(f, "RIGHT_BRACE }} null"),
+            Token::Comma            => write!(f, "COMMA , null"),
+            Token::Dot              => write!(f, "DOT . null"),
+            Token::Minus            => write!(f, "MINUS - null"),
+            Token::Plus             => write!(f, "PLUS + null"),
+            Token::Semicolon        => write!(f, "SEMICOLON ; null"),
+            Token::Star             => write!(f, "STAR * null"),
+            Token::Equal            => write!(f, "EQUAL = null"),
+            Token::EqualEqual       => write!(f, "EQUAL_EQUAL == null"),
+            Token::Bang             => write!(f, "BANG ! null"),
+            Token::BangEqual        => write!(f, "BANG_EQUAL != null"),
+            Token::Less             => write!(f, "LESS < null"),
+            Token::LessEqual        => write!(f, "LESS_EQUAL <= null"),
+            Token::Greater          => write!(f, "GREATER > null"),
+            Token::GreaterEqual     => write!(f, "GREATER_EQUAL >= null"),
+            Token::Slash            => write!(f, "SLASH / null"),
+            Token::String(s)        => write!(f, "STRING \"{}\" {}", s, s),
+            Token::Number(n, s)     => {
                 if *n == n.trunc() && !n.is_infinite() && !n.is_nan() {
                     write!(f, "NUMBER {} {}.0", s, n)
                 } else {
                     write!(f, "NUMBER {} {}", s, n)
                 }
             }
+            Token::Identifier(s)    => write!(f, "IDENTIFIER {} null", s),
         }
     }
 }
@@ -289,6 +291,15 @@ impl<'a> Iterator for Lexer<'a> {
                         }
                     };
                     Token::Number(n, s)
+                }
+                'A'..='Z' | 'a'..='z' | '_' => {
+                    let mut len = 1;
+                    while let Some(c) = self.peek() {
+                        if !matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_') { break }
+                        len += c.len_utf8();
+                        self.advance();
+                    }
+                    Token::Identifier(&s[..len])
                 }
                 _ => {
                     return Some(Err(LexerError::unexpected_character(self.line, c)));
