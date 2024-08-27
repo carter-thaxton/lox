@@ -127,17 +127,21 @@ impl LexerError {
 
 pub struct Lexer<'a> {
     rest: &'a str,
+    line: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        Lexer { rest: input }
+        Lexer { rest: input, line: 1 }
     }
 
     fn advance(&mut self) -> Option<char> {
         let mut chars = self.rest.chars();
         let c = chars.next()?;
         self.rest = chars.as_str();
+        if c == '\n' {
+            self.line += 1;
+        }
         Some(c)
     }
 
@@ -206,10 +210,11 @@ impl Iterator for Lexer<'_> {
                         Token::Slash
                     }
                 }
-
+                ' ' | '\t' | '\r' | '\n' => {
+                    continue;
+                }
                 _ => {
-                    // TODO: actually keep track of line number
-                    return Some(Err(LexerError::unexpected_character(1, c)));
+                    return Some(Err(LexerError::unexpected_character(self.line, c)));
                 },
             };
 
