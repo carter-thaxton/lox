@@ -193,9 +193,9 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, Error>;
+    type Item = Result<(Token<'a>, usize), Error>;
 
-    fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
+    fn next(&mut self) -> Option<Result<(Token<'a>, usize), Error>> {
         loop {
             let s = self.rest;
             let c = self.advance()?;
@@ -342,7 +342,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
             };
 
-            return Some(Ok(tok));
+            return Some(Ok((tok, self.line)));
         }
     }
 }

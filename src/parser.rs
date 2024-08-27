@@ -114,7 +114,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal(Literal::True));
         }
 
-        if let Some(Ok(tok)) = self.lexer.peek() {
+        if let Some(Ok(tok)) = self.peek() {
             match *tok {
                 Token::String(val, _) => {
                     self.advance();
@@ -134,7 +134,16 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Group(Box::new(expr)));
         }
 
-        unimplemented!("Handle errors")
+        Err(self.parse_error("Expect expression."))
+    }
+
+    fn parse_error(&mut self, message: &str) -> Error {
+        let line = self.peek_line().expect("Should not be at EOF");
+        let next_token = match self.peek() {
+            Some(Ok(tok)) => Some(tok),
+            _ => None,
+        };
+        Error::parser_error(line, next_token, message)
     }
 
     fn advance(&mut self) -> Token<'_> {
@@ -142,10 +151,27 @@ impl<'a> Parser<'a> {
             .next()
             .expect("Should not be at EOF")
             .expect("Should not produce a lexer error")
+            .0
+    }
+
+    fn peek(&mut self) -> Option<Result<&Token<'a>, &Error>> {
+        match self.lexer.peek() {
+            Some(Ok((token, _line))) => Some(Ok(token)),
+            Some(Err(err)) => Some(Err(err)),
+            None => None,
+        }
+    }
+
+    fn peek_line(&mut self) -> Option<usize> {
+        match self.lexer.peek() {
+            Some(Ok((_token, line))) => Some(*line),
+            Some(Err(_err)) => None,
+            None => None,
+        }
     }
 
     fn check(&mut self, token: Token<'_>) -> bool {
-        if let Some(Ok(tok)) = self.lexer.peek() {
+        if let Some(Ok(tok)) = self.peek() {
             if *tok == token {
                 return true;
             }
@@ -154,7 +180,7 @@ impl<'a> Parser<'a> {
     }
 
     fn check_n(&mut self, tokens: &[Token<'_>]) -> bool {
-        if let Some(Ok(tok)) = self.lexer.peek() {
+        if let Some(Ok(tok)) = self.peek() {
             if tokens.contains(tok) {
                 return true
             }
@@ -182,7 +208,7 @@ impl<'a> Parser<'a> {
     // where
     //     P: FnOnce(Token<'_>) -> bool
     // {
-    //     if let Some(Ok(tok)) = self.lexer.peek() {
+    //     if let Some(Ok(tok)) = self.peek() {
     //         if pred(*tok) {
     //             return true
     //         }
