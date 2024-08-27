@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use std::env;
+use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::{self, Write};
 
@@ -26,11 +26,11 @@ fn main() {
                 match result {
                     Ok(token) => {
                         println!("{}", token);
-                    },
+                    }
                     Err(err) => {
                         eprintln!("{}", err);
                         lexer_error = true;
-                    },
+                    }
                 }
             }
             println!("EOF  null");
@@ -92,6 +92,7 @@ pub enum Token<'a> {
 }
 
 impl Display for Token<'_> {
+    #[rustfmt::skip]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Token::LeftParen        => write!(f, "LEFT_PAREN ( null"),
@@ -179,15 +180,24 @@ impl Display for LexerErrorKind {
 
 impl LexerError {
     pub fn unexpected_character(line: usize, ch: char) -> Self {
-        LexerError { line: line, kind: LexerErrorKind::UnexpectedCharacter(ch) }
+        LexerError {
+            line: line,
+            kind: LexerErrorKind::UnexpectedCharacter(ch),
+        }
     }
 
     pub fn unterminated_string(line: usize) -> Self {
-        LexerError { line: line, kind: LexerErrorKind::UnterminatedString }
+        LexerError {
+            line: line,
+            kind: LexerErrorKind::UnterminatedString,
+        }
     }
 
     pub fn invalid_number(line: usize, s: &str) -> Self {
-        LexerError { line: line, kind: LexerErrorKind::InvalidNumber(s.to_owned()) }
+        LexerError {
+            line: line,
+            kind: LexerErrorKind::InvalidNumber(s.to_owned()),
+        }
     }
 }
 
@@ -199,7 +209,10 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        Lexer { rest: input, line: 1 }
+        Lexer {
+            rest: input,
+            line: 1,
+        }
     }
 
     fn advance(&mut self) -> Option<char> {
@@ -244,7 +257,7 @@ impl<'a> Iterator for Lexer<'a> {
                 '*' => Token::Star,
                 '=' => {
                     if self.peek() == Some('=') {
-                        self.advance().unwrap();
+                        self.advance();
                         Token::EqualEqual
                     } else {
                         Token::Equal
@@ -252,7 +265,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 '!' => {
                     if self.peek() == Some('=') {
-                        self.advance().unwrap();
+                        self.advance();
                         Token::BangEqual
                     } else {
                         Token::Bang
@@ -260,7 +273,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 '<' => {
                     if self.peek() == Some('=') {
-                        self.advance().unwrap();
+                        self.advance();
                         Token::LessEqual
                     } else {
                         Token::Less
@@ -268,7 +281,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 '>' => {
                     if self.peek() == Some('=') {
-                        self.advance().unwrap();
+                        self.advance();
                         Token::GreaterEqual
                     } else {
                         Token::Greater
@@ -277,7 +290,9 @@ impl<'a> Iterator for Lexer<'a> {
                 '/' => {
                     if self.peek() == Some('/') {
                         while let Some(c) = self.advance() {
-                            if c == '\n' { break }
+                            if c == '\n' {
+                                break;
+                            }
                         }
                         continue;
                     } else {
@@ -295,24 +310,32 @@ impl<'a> Iterator for Lexer<'a> {
                             return Some(Err(LexerError::unterminated_string(line)));
                         };
                         len += c.len_utf8();
-                        if c != '"' { continue }
-                        break Token::String(&s[1..len-1]);
+                        if c != '"' {
+                            continue;
+                        }
+                        let s = &s[1..len - 1];
+                        break Token::String(s);
                     }
                 }
                 '0'..='9' => {
                     let mut len = 1;
                     while let Some(c) = self.peek() {
-                        if !c.is_digit(10) { break }
+                        if !c.is_digit(10) {
+                            break;
+                        }
                         len += c.len_utf8();
                         self.advance();
                     }
 
-                    if self.peek() == Some('.') && self.peek_next().is_some_and(|c| c.is_digit(10)) {
-                        self.advance();  // dot
+                    if self.peek() == Some('.') && self.peek_next().is_some_and(|c| c.is_digit(10))
+                    {
+                        self.advance(); // dot
                         len += 1;
 
                         while let Some(c) = self.peek() {
-                            if !c.is_digit(10) { break }
+                            if !c.is_digit(10) {
+                                break;
+                            }
                             len += c.len_utf8();
                             self.advance();
                         }
@@ -327,6 +350,7 @@ impl<'a> Iterator for Lexer<'a> {
                     };
                     Token::Number(n, s)
                 }
+                #[rustfmt::skip]
                 'A'..='Z' | 'a'..='z' | '_' => {
                     let mut len = 1;
                     while let Some(c) = self.peek() {
@@ -358,7 +382,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 _ => {
                     return Some(Err(LexerError::unexpected_character(self.line, c)));
-                },
+                }
             };
 
             return Some(Ok(tok));
