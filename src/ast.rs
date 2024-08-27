@@ -27,18 +27,18 @@ pub enum Literal {
 }
 
 pub enum Op {
-    Add,
-    Sub,
+    Not,
+    Neg,
     Mul,
     Div,
-    Neg,
-    Not,
-    Eq,
-    Ne,
+    Add,
+    Sub,
     Lt,
     Le,
     Gt,
     Ge,
+    Eq,
+    Ne,
 }
 
 impl Display for AstNode {
@@ -89,18 +89,18 @@ impl Display for Literal {
 impl Display for Op {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let s = match self {
-            Op::Add => "+",
-            Op::Sub => "-",
-            Op::Mul => "*",
-            Op::Div => "/",
             Op::Not => "!",
             Op::Neg => "-",
-            Op::Eq => "==",
-            Op::Ne => "!=",
+            Op::Mul => "*",
+            Op::Div => "/",
+            Op::Add => "+",
+            Op::Sub => "-",
             Op::Lt => "<",
             Op::Le => "<=",
             Op::Gt => ">",
             Op::Ge => ">=",
+            Op::Eq => "==",
+            Op::Ne => "!=",
         };
         write!(f, "{}", s)
     }

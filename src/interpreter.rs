@@ -77,13 +77,37 @@ pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
         Expr::Group(expr) => evaluate(expr),
 
         Expr::UnaryExpr { op: Op::Not, right } => {
-            let val = evaluate(right)?;
-            Ok((!val.is_truthy()).into())
+            let right = evaluate(right)?.is_truthy();
+            Ok((!right).into())
         }
 
         Expr::UnaryExpr { op: Op::Neg, right } => {
-            let val = evaluate_to_number(right)?;
-            Ok(Value::Number(-val))
+            let right = evaluate_to_number(right)?;
+            Ok(Value::Number(-right))
+        }
+
+        Expr::BinaryExpr { op: Op::Mul, left, right } => {
+            let left = evaluate_to_number(left)?;
+            let right = evaluate_to_number(right)?;
+            Ok(Value::Number(left * right))
+        }
+
+        Expr::BinaryExpr { op: Op::Div, left, right } => {
+            let left = evaluate_to_number(left)?;
+            let right = evaluate_to_number(right)?;
+            Ok(Value::Number(left / right))
+        }
+
+        Expr::BinaryExpr { op: Op::Add, left, right } => {
+            let left = evaluate_to_number(left)?;
+            let right = evaluate_to_number(right)?;
+            Ok(Value::Number(left + right))
+        }
+
+        Expr::BinaryExpr { op: Op::Sub, left, right } => {
+            let left = evaluate_to_number(left)?;
+            let right = evaluate_to_number(right)?;
+            Ok(Value::Number(left - right))
         }
 
         _ => Err(Error::runtime_error("Unexpected expression.")),
