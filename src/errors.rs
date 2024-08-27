@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
-use crate::lexer::Token;
+use crate::lexer::TokenKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error {
@@ -69,7 +69,7 @@ impl Error {
         }
     }
 
-    pub fn parser_error(line: usize, token: Option<&Token<'_>>, message: &str) -> Self {
+    pub fn parser_error(line: usize, token: Option<&TokenKind<'_>>, message: &str) -> Self {
         let lexeme = token.map(|t| t.lexeme().to_owned());
         Error {
             line,

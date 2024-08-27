@@ -2,8 +2,22 @@ use crate::errors::*;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
+// #[derive(Debug, Clone, Copy, PartialEq)]
+// pub struct Token<'a> {
+//     kind: TokenKind<'a>,
+//     span: Span,
+// }
+
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Token<'a> {
+pub struct Span {
+    line: usize,
+    col: usize,
+    pos: usize,
+    len: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenKind<'a> {
     LeftParen,
     RightParen,
     LeftBrace,
@@ -47,111 +61,111 @@ pub enum Token<'a> {
     While,
 }
 
-impl Display for Token<'_> {
+impl Display for TokenKind<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{} {} {}", self.name(), self.lexeme(), self.value())
     }
 }
 
-impl Token<'_> {
+impl TokenKind<'_> {
     #[rustfmt::skip]
     pub fn name(&self) -> &str {
         match self {
-            Token::LeftParen        => "LEFT_PAREN",
-            Token::RightParen       => "RIGHT_PAREN",
-            Token::LeftBrace        => "LEFT_BRACE",
-            Token::RightBrace       => "RIGHT_BRACE",
-            Token::Comma            => "COMMA",
-            Token::Dot              => "DOT",
-            Token::Minus            => "MINUS",
-            Token::Plus             => "PLUS",
-            Token::Semicolon        => "SEMICOLON",
-            Token::Star             => "STAR",
-            Token::Equal            => "EQUAL",
-            Token::EqualEqual       => "EQUAL_EQUAL",
-            Token::Bang             => "BANG",
-            Token::BangEqual        => "BANG_EQUAL",
-            Token::Less             => "LESS",
-            Token::LessEqual        => "LESS_EQUAL",
-            Token::Greater          => "GREATER",
-            Token::GreaterEqual     => "GREATER_EQUAL",
-            Token::Slash            => "SLASH",
-            Token::String(_, _)     => "STRING",
-            Token::Number(_, _)     => "NUMBER",
-            Token::Identifier(_)    => "IDENTIFIER",
-            Token::And              => "AND",
-            Token::Class            => "CLASS",
-            Token::Else             => "ELSE",
-            Token::False            => "FALSE",
-            Token::For              => "FOR",
-            Token::Fun              => "FUN",
-            Token::If               => "IF",
-            Token::Nil              => "NIL",
-            Token::Or               => "OR",
-            Token::Print            => "PRINT",
-            Token::Return           => "RETURN",
-            Token::Super            => "SUPER",
-            Token::This             => "THIS",
-            Token::True             => "TRUE",
-            Token::Var              => "VAR",
-            Token::While            => "WHILE",
+            TokenKind::LeftParen        => "LEFT_PAREN",
+            TokenKind::RightParen       => "RIGHT_PAREN",
+            TokenKind::LeftBrace        => "LEFT_BRACE",
+            TokenKind::RightBrace       => "RIGHT_BRACE",
+            TokenKind::Comma            => "COMMA",
+            TokenKind::Dot              => "DOT",
+            TokenKind::Minus            => "MINUS",
+            TokenKind::Plus             => "PLUS",
+            TokenKind::Semicolon        => "SEMICOLON",
+            TokenKind::Star             => "STAR",
+            TokenKind::Equal            => "EQUAL",
+            TokenKind::EqualEqual       => "EQUAL_EQUAL",
+            TokenKind::Bang             => "BANG",
+            TokenKind::BangEqual        => "BANG_EQUAL",
+            TokenKind::Less             => "LESS",
+            TokenKind::LessEqual        => "LESS_EQUAL",
+            TokenKind::Greater          => "GREATER",
+            TokenKind::GreaterEqual     => "GREATER_EQUAL",
+            TokenKind::Slash            => "SLASH",
+            TokenKind::String(_, _)     => "STRING",
+            TokenKind::Number(_, _)     => "NUMBER",
+            TokenKind::Identifier(_)    => "IDENTIFIER",
+            TokenKind::And              => "AND",
+            TokenKind::Class            => "CLASS",
+            TokenKind::Else             => "ELSE",
+            TokenKind::False            => "FALSE",
+            TokenKind::For              => "FOR",
+            TokenKind::Fun              => "FUN",
+            TokenKind::If               => "IF",
+            TokenKind::Nil              => "NIL",
+            TokenKind::Or               => "OR",
+            TokenKind::Print            => "PRINT",
+            TokenKind::Return           => "RETURN",
+            TokenKind::Super            => "SUPER",
+            TokenKind::This             => "THIS",
+            TokenKind::True             => "TRUE",
+            TokenKind::Var              => "VAR",
+            TokenKind::While            => "WHILE",
         }
     }
 
     #[rustfmt::skip]
     pub fn lexeme(&self) -> &str {
         match self {
-            Token::LeftParen        => "(",
-            Token::RightParen       => ")",
-            Token::LeftBrace        => "{",
-            Token::RightBrace       => "}",
-            Token::Comma            => ",",
-            Token::Dot              => ".",
-            Token::Minus            => "-",
-            Token::Plus             => "+",
-            Token::Semicolon        => ";",
-            Token::Star             => "*",
-            Token::Equal            => "=",
-            Token::EqualEqual       => "==",
-            Token::Bang             => "!",
-            Token::BangEqual        => "!=",
-            Token::Less             => "<",
-            Token::LessEqual        => "<=",
-            Token::Greater          => ">",
-            Token::GreaterEqual     => ">=",
-            Token::Slash            => "/",
-            Token::Number(_, s)     => s,
-            Token::Identifier(s)    => s,
-            Token::String(_, s)     => s,
-            Token::And              => "and",
-            Token::Class            => "class",
-            Token::Else             => "else",
-            Token::False            => "false",
-            Token::For              => "for",
-            Token::Fun              => "fun",
-            Token::If               => "if",
-            Token::Nil              => "nil",
-            Token::Or               => "or",
-            Token::Print            => "print",
-            Token::Return           => "return",
-            Token::Super            => "super",
-            Token::This             => "this",
-            Token::True             => "true",
-            Token::Var              => "var",
-            Token::While            => "while",
+            TokenKind::LeftParen        => "(",
+            TokenKind::RightParen       => ")",
+            TokenKind::LeftBrace        => "{",
+            TokenKind::RightBrace       => "}",
+            TokenKind::Comma            => ",",
+            TokenKind::Dot              => ".",
+            TokenKind::Minus            => "-",
+            TokenKind::Plus             => "+",
+            TokenKind::Semicolon        => ";",
+            TokenKind::Star             => "*",
+            TokenKind::Equal            => "=",
+            TokenKind::EqualEqual       => "==",
+            TokenKind::Bang             => "!",
+            TokenKind::BangEqual        => "!=",
+            TokenKind::Less             => "<",
+            TokenKind::LessEqual        => "<=",
+            TokenKind::Greater          => ">",
+            TokenKind::GreaterEqual     => ">=",
+            TokenKind::Slash            => "/",
+            TokenKind::Number(_, s)     => s,
+            TokenKind::Identifier(s)    => s,
+            TokenKind::String(_, s)     => s,
+            TokenKind::And              => "and",
+            TokenKind::Class            => "class",
+            TokenKind::Else             => "else",
+            TokenKind::False            => "false",
+            TokenKind::For              => "for",
+            TokenKind::Fun              => "fun",
+            TokenKind::If               => "if",
+            TokenKind::Nil              => "nil",
+            TokenKind::Or               => "or",
+            TokenKind::Print            => "print",
+            TokenKind::Return           => "return",
+            TokenKind::Super            => "super",
+            TokenKind::This             => "this",
+            TokenKind::True             => "true",
+            TokenKind::Var              => "var",
+            TokenKind::While            => "while",
         }
     }
 
     pub fn value(&self) -> Cow<str> {
         match self {
-            Token::Number(val, _) => {
+            TokenKind::Number(val, _) => {
                 if *val == val.trunc() && !val.is_infinite() && !val.is_nan() {
                     format!("{}.0", val).into()
                 } else {
                     format!("{}", val).into()
                 }
             }
-            Token::String(val, _) => Cow::Borrowed(val),
+            TokenKind::String(val, _) => Cow::Borrowed(val),
             _ => "null".into(),
         }
     }
@@ -193,54 +207,54 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<(Token<'a>, usize), Error>;
+    type Item = Result<(TokenKind<'a>, usize), Error>;
 
-    fn next(&mut self) -> Option<Result<(Token<'a>, usize), Error>> {
+    fn next(&mut self) -> Option<Result<(TokenKind<'a>, usize), Error>> {
         loop {
             let s = self.rest;
             let c = self.advance()?;
 
             let tok = match c {
-                '(' => Token::LeftParen,
-                ')' => Token::RightParen,
-                '{' => Token::LeftBrace,
-                '}' => Token::RightBrace,
-                ',' => Token::Comma,
-                '.' => Token::Dot,
-                '-' => Token::Minus,
-                '+' => Token::Plus,
-                ';' => Token::Semicolon,
-                '*' => Token::Star,
+                '(' => TokenKind::LeftParen,
+                ')' => TokenKind::RightParen,
+                '{' => TokenKind::LeftBrace,
+                '}' => TokenKind::RightBrace,
+                ',' => TokenKind::Comma,
+                '.' => TokenKind::Dot,
+                '-' => TokenKind::Minus,
+                '+' => TokenKind::Plus,
+                ';' => TokenKind::Semicolon,
+                '*' => TokenKind::Star,
                 '=' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        Token::EqualEqual
+                        TokenKind::EqualEqual
                     } else {
-                        Token::Equal
+                        TokenKind::Equal
                     }
                 }
                 '!' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        Token::BangEqual
+                        TokenKind::BangEqual
                     } else {
-                        Token::Bang
+                        TokenKind::Bang
                     }
                 }
                 '<' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        Token::LessEqual
+                        TokenKind::LessEqual
                     } else {
-                        Token::Less
+                        TokenKind::Less
                     }
                 }
                 '>' => {
                     if self.peek() == Some('=') {
                         self.advance();
-                        Token::GreaterEqual
+                        TokenKind::GreaterEqual
                     } else {
-                        Token::Greater
+                        TokenKind::Greater
                     }
                 }
                 '/' => {
@@ -252,7 +266,7 @@ impl<'a> Iterator for Lexer<'a> {
                         }
                         continue;
                     } else {
-                        Token::Slash
+                        TokenKind::Slash
                     }
                 }
                 ' ' | '\t' | '\r' | '\n' => {
@@ -271,7 +285,7 @@ impl<'a> Iterator for Lexer<'a> {
                         }
                         let lexeme = &s[..len];
                         let val = &s[1..len - 1];
-                        break Token::String(val, lexeme);
+                        break TokenKind::String(val, lexeme);
                     }
                 }
                 '0'..='9' => {
@@ -305,7 +319,7 @@ impl<'a> Iterator for Lexer<'a> {
                             return Some(Err(Error::invalid_number(self.line, lexeme)));
                         }
                     };
-                    Token::Number(val, lexeme)
+                    TokenKind::Number(val, lexeme)
                 }
                 #[rustfmt::skip]
                 'A'..='Z' | 'a'..='z' | '_' => {
@@ -318,23 +332,23 @@ impl<'a> Iterator for Lexer<'a> {
                     let lexeme = &s[..len];
 
                     match lexeme {
-                        "and"       => Token::And,
-                        "class"     => Token::Class,
-                        "else"      => Token::Else,
-                        "false"     => Token::False,
-                        "for"       => Token::For,
-                        "fun"       => Token::Fun,
-                        "if"        => Token::If,
-                        "nil"       => Token::Nil,
-                        "or"        => Token::Or,
-                        "print"     => Token::Print,
-                        "return"    => Token::Return,
-                        "super"     => Token::Super,
-                        "this"      => Token::This,
-                        "true"      => Token::True,
-                        "var"       => Token::Var,
-                        "while"     => Token::While,
-                        _           => Token::Identifier(lexeme),
+                        "and"       => TokenKind::And,
+                        "class"     => TokenKind::Class,
+                        "else"      => TokenKind::Else,
+                        "false"     => TokenKind::False,
+                        "for"       => TokenKind::For,
+                        "fun"       => TokenKind::Fun,
+                        "if"        => TokenKind::If,
+                        "nil"       => TokenKind::Nil,
+                        "or"        => TokenKind::Or,
+                        "print"     => TokenKind::Print,
+                        "return"    => TokenKind::Return,
+                        "super"     => TokenKind::Super,
+                        "this"      => TokenKind::This,
+                        "true"      => TokenKind::True,
+                        "var"       => TokenKind::Var,
+                        "while"     => TokenKind::While,
+                        _           => TokenKind::Identifier(lexeme),
                     }
                 }
                 _ => {

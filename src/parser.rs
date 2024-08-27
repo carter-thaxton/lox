@@ -27,10 +27,10 @@ impl<'a> Parser<'a> {
     fn parse_equality(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_comparison()?;
 
-        while let Some(tok) = self.matches_n(&[Token::EqualEqual, Token::BangEqual]) {
+        while let Some(tok) = self.matches_n(&[TokenKind::EqualEqual, TokenKind::BangEqual]) {
             let op = match tok {
-                Token::EqualEqual => Op::Eq,
-                Token::BangEqual => Op::Ne,
+                TokenKind::EqualEqual => Op::Eq,
+                TokenKind::BangEqual => Op::Ne,
                 _ => unreachable!(),
             };
             let right = self.parse_comparison()?;
@@ -43,12 +43,12 @@ impl<'a> Parser<'a> {
     fn parse_comparison(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_term()?;
 
-        while let Some(tok) = self.matches_n(&[Token::Less, Token::LessEqual, Token::Greater, Token::GreaterEqual]) {
+        while let Some(tok) = self.matches_n(&[TokenKind::Less, TokenKind::LessEqual, TokenKind::Greater, TokenKind::GreaterEqual]) {
             let op = match tok {
-                Token::Less => Op::Lt,
-                Token::LessEqual => Op::Le,
-                Token::Greater => Op::Gt,
-                Token::GreaterEqual => Op::Ge,
+                TokenKind::Less => Op::Lt,
+                TokenKind::LessEqual => Op::Le,
+                TokenKind::Greater => Op::Gt,
+                TokenKind::GreaterEqual => Op::Ge,
                 _ => unreachable!(),
             };
             let right = self.parse_term()?;
@@ -61,10 +61,10 @@ impl<'a> Parser<'a> {
     fn parse_term(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_factor()?;
 
-        while let Some(tok) = self.matches_n(&[Token::Plus, Token::Minus]) {
+        while let Some(tok) = self.matches_n(&[TokenKind::Plus, TokenKind::Minus]) {
             let op = match tok {
-                Token::Plus => Op::Add,
-                Token::Minus => Op::Sub,
+                TokenKind::Plus => Op::Add,
+                TokenKind::Minus => Op::Sub,
                 _ => unreachable!(),
             };
             let right = self.parse_factor()?;
@@ -77,10 +77,10 @@ impl<'a> Parser<'a> {
     fn parse_factor(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_unary()?;
 
-        while let Some(tok) = self.matches_n(&[Token::Star, Token::Slash]) {
+        while let Some(tok) = self.matches_n(&[TokenKind::Star, TokenKind::Slash]) {
             let op = match tok {
-                Token::Star => Op::Mul,
-                Token::Slash => Op::Div,
+                TokenKind::Star => Op::Mul,
+                TokenKind::Slash => Op::Div,
                 _ => unreachable!(),
             };
             let right = self.parse_unary()?;
@@ -91,11 +91,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_unary(&mut self) -> Result<Expr, Error> {
-        if self.matches(Token::Minus).is_some() {
+        if self.matches(TokenKind::Minus).is_some() {
             let right = self.parse_unary()?;
             return Ok(Expr::UnaryExpr { op: Op::Neg, right: Box::new(right) });
         }
-        if self.matches(Token::Bang).is_some() {
+        if self.matches(TokenKind::Bang).is_some() {
             let right = self.parse_unary()?;
             return Ok(Expr::UnaryExpr { op: Op::Not, right: Box::new(right) });
         }
@@ -104,23 +104,23 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary(&mut self) -> Result<Expr, Error> {
-        if self.matches(Token::Nil).is_some() {
+        if self.matches(TokenKind::Nil).is_some() {
             return Ok(Expr::Literal(Literal::Nil));
         }
-        if self.matches(Token::False).is_some() {
+        if self.matches(TokenKind::False).is_some() {
             return Ok(Expr::Literal(Literal::False));
         }
-        if self.matches(Token::True).is_some() {
+        if self.matches(TokenKind::True).is_some() {
             return Ok(Expr::Literal(Literal::True));
         }
 
         if let Some(Ok(tok)) = self.peek() {
             match *tok {
-                Token::String(val, _) => {
+                TokenKind::String(val, _) => {
                     self.advance();
                     return Ok(Expr::Literal(Literal::String(val.to_owned())));
                 }
-                Token::Number(val, _) => {
+                TokenKind::Number(val, _) => {
                     self.advance();
                     return Ok(Expr::Literal(Literal::Number(val)));
                 }
@@ -128,9 +128,9 @@ impl<'a> Parser<'a> {
             }
         }
 
-        if self.matches(Token::LeftParen).is_some() {
+        if self.matches(TokenKind::LeftParen).is_some() {
             let expr = self.parse_expr()?;
-            self.expect(Token::RightParen)?;
+            self.expect(TokenKind::RightParen)?;
             return Ok(Expr::Group(Box::new(expr)));
         }
 
@@ -146,7 +146,7 @@ impl<'a> Parser<'a> {
         Error::parser_error(line, next_token, message)
     }
 
-    fn advance(&mut self) -> Token<'_> {
+    fn advance(&mut self) -> TokenKind<'_> {
         self.lexer
             .next()
             .expect("Should not be at EOF")
@@ -154,7 +154,7 @@ impl<'a> Parser<'a> {
             .0
     }
 
-    fn peek(&mut self) -> Option<Result<&Token<'a>, &Error>> {
+    fn peek(&mut self) -> Option<Result<&TokenKind<'a>, &Error>> {
         match self.lexer.peek() {
             Some(Ok((token, _line))) => Some(Ok(token)),
             Some(Err(err)) => Some(Err(err)),
@@ -170,7 +170,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn check(&mut self, token: Token<'_>) -> bool {
+    fn check(&mut self, token: TokenKind<'_>) -> bool {
         if let Some(Ok(tok)) = self.peek() {
             if *tok == token {
                 return true;
@@ -179,7 +179,7 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn check_n(&mut self, tokens: &[Token<'_>]) -> bool {
+    fn check_n(&mut self, tokens: &[TokenKind<'_>]) -> bool {
         if let Some(Ok(tok)) = self.peek() {
             if tokens.contains(tok) {
                 return true
@@ -188,7 +188,7 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn matches(&mut self, token: Token<'_>) -> Option<Token<'_>> {
+    fn matches(&mut self, token: TokenKind<'_>) -> Option<TokenKind<'_>> {
         if self.check(token) {
             Some(self.advance())
         } else {
@@ -196,7 +196,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn matches_n(&mut self, tokens: &[Token<'_>]) -> Option<Token<'_>> {
+    fn matches_n(&mut self, tokens: &[TokenKind<'_>]) -> Option<TokenKind<'_>> {
         if self.check_n(tokens) {
             Some(self.advance())
         } else {
@@ -227,7 +227,7 @@ impl<'a> Parser<'a> {
     //     }
     // }
 
-    fn expect(&mut self, token: Token<'_>) -> Result<(), Error> {
+    fn expect(&mut self, token: TokenKind<'_>) -> Result<(), Error> {
         if self.check(token) {
             self.advance();
             Ok(())
