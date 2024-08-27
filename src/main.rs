@@ -2,10 +2,12 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 
-pub mod lexer;
 pub mod errors;
+pub mod lexer;
+pub mod parser;
 
 use lexer::Lexer;
+use parser::parse;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -44,17 +46,22 @@ fn main() {
             }
         }
         "parse" => {
-            let _file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
                 writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
                 String::new()
             });
 
-            todo!();
-            // let ast = parse(Lexer::new(&file_contents));
+            let result = parse(Lexer::new(&file_contents));
 
-            // if lexer_error {
-            //     std::process::exit(65);
-            // }
+            match result {
+                Ok(ast) => {
+                    println!("{}", ast);
+                }
+                Err(err) => {
+                    eprintln!("{}", err);
+                    std::process::exit(65);
+                }
+            }
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();

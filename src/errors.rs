@@ -15,7 +15,13 @@ pub enum ErrorKind {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "[line {}] Error{}: {}", self.line, self.at_message(), self.kind)
+        write!(
+            f,
+            "[line {}] Error{}: {}",
+            self.line,
+            self.at_message(),
+            self.kind
+        )
     }
 }
 

@@ -1,6 +1,6 @@
+use crate::errors::*;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
-use crate::errors::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Token<'a> {
