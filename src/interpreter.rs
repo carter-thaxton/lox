@@ -137,7 +137,34 @@ pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
             Ok((left >= right).into())
         }
 
+        Expr::BinaryExpr { op: Op::Eq, left, right } => {
+            let left = evaluate(left)?;
+            let right = evaluate(right)?;
+
+            let equal = compare_values(&left, &right);
+            Ok(equal.into())
+        }
+
+        Expr::BinaryExpr { op: Op::Ne, left, right } => {
+            let left = evaluate(left)?;
+            let right = evaluate(right)?;
+
+            let equal = compare_values(&left, &right);
+            Ok((!equal).into())
+        }
+
         _ => Err(Error::runtime_error("Unexpected expression.")),
+    }
+}
+
+fn compare_values(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Nil, Value::Nil) => true,
+        (Value::True, Value::True) => true,
+        (Value::False, Value::False) => true,
+        (Value::Number(left), Value::Number(right)) => left == right,
+        (Value::String(left), Value::String(right)) => left == right,
+        _ => false,
     }
 }
 
