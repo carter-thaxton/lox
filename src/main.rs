@@ -65,6 +65,7 @@ pub enum Token {
     LessEqual,
     Greater,
     GreaterEqual,
+    Slash,
 }
 
 impl Display for Token {
@@ -88,6 +89,7 @@ impl Display for Token {
             Token::LessEqual    => write!(f, "LESS_EQUAL <= null"),
             Token::Greater      => write!(f, "GREATER > null"),
             Token::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
+            Token::Slash        => write!(f, "SLASH / null"),
         }
     }
 }
@@ -148,57 +150,70 @@ impl Iterator for Lexer<'_> {
     type Item = Result<Token, LexerError>;
 
     fn next(&mut self) -> Option<Result<Token, LexerError>> {
-        let c = self.advance()?;
+        loop {
+            let c = self.advance()?;
 
-        let tok = match c {
-            '(' => Token::LeftParen,
-            ')' => Token::RightParen,
-            '{' => Token::LeftBrace,
-            '}' => Token::RightBrace,
-            ',' => Token::Comma,
-            '.' => Token::Dot,
-            '-' => Token::Minus,
-            '+' => Token::Plus,
-            ';' => Token::Semicolon,
-            '*' => Token::Star,
-            '=' => {
-                if self.peek() == Some('=') {
-                    self.advance().unwrap();
-                    Token::EqualEqual
-                } else {
-                    Token::Equal
+            let tok = match c {
+                '(' => Token::LeftParen,
+                ')' => Token::RightParen,
+                '{' => Token::LeftBrace,
+                '}' => Token::RightBrace,
+                ',' => Token::Comma,
+                '.' => Token::Dot,
+                '-' => Token::Minus,
+                '+' => Token::Plus,
+                ';' => Token::Semicolon,
+                '*' => Token::Star,
+                '=' => {
+                    if self.peek() == Some('=') {
+                        self.advance().unwrap();
+                        Token::EqualEqual
+                    } else {
+                        Token::Equal
+                    }
                 }
-            }
-            '!' => {
-                if self.peek() == Some('=') {
-                    self.advance().unwrap();
-                    Token::BangEqual
-                } else {
-                    Token::Bang
+                '!' => {
+                    if self.peek() == Some('=') {
+                        self.advance().unwrap();
+                        Token::BangEqual
+                    } else {
+                        Token::Bang
+                    }
                 }
-            }
-            '<' => {
-                if self.peek() == Some('=') {
-                    self.advance().unwrap();
-                    Token::LessEqual
-                } else {
-                    Token::Less
+                '<' => {
+                    if self.peek() == Some('=') {
+                        self.advance().unwrap();
+                        Token::LessEqual
+                    } else {
+                        Token::Less
+                    }
                 }
-            }
-            '>' => {
-                if self.peek() == Some('=') {
-                    self.advance().unwrap();
-                    Token::GreaterEqual
-                } else {
-                    Token::Greater
+                '>' => {
+                    if self.peek() == Some('=') {
+                        self.advance().unwrap();
+                        Token::GreaterEqual
+                    } else {
+                        Token::Greater
+                    }
                 }
-            }
-            _ => {
-                // TODO: actually keep track of line number
-                return Some(Err(LexerError::unexpected_character(1, c)));
-            },
-        };
+                '/' => {
+                    if self.peek() == Some('/') {
+                        while let Some(c) = self.advance() {
+                            if c == '\n' { break }
+                        }
+                        continue;
+                    } else {
+                        Token::Slash
+                    }
+                }
 
-        Some(Ok(tok))
+                _ => {
+                    // TODO: actually keep track of line number
+                    return Some(Err(LexerError::unexpected_character(1, c)));
+                },
+            };
+
+            return Some(Ok(tok));
+        }
     }
 }
