@@ -46,7 +46,7 @@ fn main() {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Token<'a> {
     LeftParen,
     RightParen,
@@ -68,6 +68,7 @@ pub enum Token<'a> {
     GreaterEqual,
     Slash,
     String(&'a str),
+    Number(f64, &'a str)
 }
 
 impl Display for Token<'_> {
@@ -93,20 +94,28 @@ impl Display for Token<'_> {
             Token::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
             Token::Slash        => write!(f, "SLASH / null"),
             Token::String(s)    => write!(f, "STRING \"{}\" {}", s, s),
+            Token::Number(n, s) => {
+                if *n == n.trunc() && !n.is_infinite() && !n.is_nan() {
+                    write!(f, "NUMBER {} {}.0", s, n)
+                } else {
+                    write!(f, "NUMBER {} {}", s, n)
+                }
+            }
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LexerError {
     line: usize,
     kind: LexerErrorKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LexerErrorKind {
     UnexpectedCharacter(char),
     UnterminatedString,
+    InvalidNumber(String),
 }
 
 impl Display for LexerError {
@@ -124,6 +133,9 @@ impl Display for LexerErrorKind {
             LexerErrorKind::UnterminatedString => {
                 write!(f, "Unterminated string.")
             }
+            LexerErrorKind::InvalidNumber(s) => {
+                write!(f, "Invalid number: {}", s)
+            }
         }
     }
 }
@@ -135,6 +147,10 @@ impl LexerError {
 
     pub fn unterminated_string(line: usize) -> Self {
         LexerError { line: line, kind: LexerErrorKind::UnterminatedString }
+    }
+
+    pub fn invalid_number(line: usize, s: &str) -> Self {
+        LexerError { line: line, kind: LexerErrorKind::InvalidNumber(s.to_owned()) }
     }
 }
 
@@ -162,6 +178,12 @@ impl<'a> Lexer<'a> {
     fn peek(&self) -> Option<char> {
         self.rest.chars().next()
     }
+
+    fn peek_next(&self) -> Option<char> {
+        let mut chars = self.rest.chars();
+        chars.next()?;
+        chars.next()
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -169,6 +191,7 @@ impl<'a> Iterator for Lexer<'a> {
 
     fn next(&mut self) -> Option<Result<Token<'a>, LexerError>> {
         loop {
+            let s = self.rest;
             let c = self.advance()?;
 
             let tok = match c {
@@ -229,16 +252,43 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 '"' => {
                     let line = self.line;
-                    let s = self.rest;
-                    let mut len = 0;
+                    let mut len = 1;
                     loop {
                         let Some(c) = self.advance() else {
                             return Some(Err(LexerError::unterminated_string(line)));
                         };
                         len += c.len_utf8();
                         if c != '"' { continue }
-                        break Token::String(&s[..len-1]);
+                        break Token::String(&s[1..len-1]);
                     }
+                }
+                '0'..='9' => {
+                    let mut len = 1;
+                    while let Some(c) = self.peek() {
+                        if !c.is_digit(10) { break }
+                        len += c.len_utf8();
+                        self.advance();
+                    }
+
+                    if self.peek() == Some('.') && self.peek_next().is_some_and(|c| c.is_digit(10)) {
+                        self.advance();  // dot
+                        len += 1;
+
+                        while let Some(c) = self.peek() {
+                            if !c.is_digit(10) { break }
+                            len += c.len_utf8();
+                            self.advance();
+                        }
+                    }
+
+                    let s = &s[..len];
+                    let n: f64 = match s.parse() {
+                        Ok(n) => n,
+                        Err(_) => {
+                            return Some(Err(LexerError::invalid_number(self.line, s)));
+                        }
+                    };
+                    Token::Number(n, s)
                 }
                 _ => {
                     return Some(Err(LexerError::unexpected_character(self.line, c)));
