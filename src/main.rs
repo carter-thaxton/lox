@@ -66,6 +66,7 @@ pub enum Token {
     Greater,
     GreaterEqual,
     Slash,
+    String(String),
 }
 
 impl Display for Token {
@@ -90,6 +91,7 @@ impl Display for Token {
             Token::Greater      => write!(f, "GREATER > null"),
             Token::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
             Token::Slash        => write!(f, "SLASH / null"),
+            Token::String(s)    => write!(f, "STRING \"{}\" {}", s, s),
         }
     }
 }
@@ -101,6 +103,7 @@ pub struct LexerError {
 
 pub enum LexerErrorKind {
     UnexpectedCharacter(char),
+    UnterminatedString,
 }
 
 impl Display for LexerError {
@@ -115,6 +118,9 @@ impl Display for LexerErrorKind {
             LexerErrorKind::UnexpectedCharacter(c) => {
                 write!(f, "Unexpected character: {}", c)
             }
+            LexerErrorKind::UnterminatedString => {
+                write!(f, "Unterminated string.")
+            }
         }
     }
 }
@@ -122,6 +128,10 @@ impl Display for LexerErrorKind {
 impl LexerError {
     pub fn unexpected_character(line: usize, ch: char) -> Self {
         LexerError { line: line, kind: LexerErrorKind::UnexpectedCharacter(ch) }
+    }
+
+    pub fn unterminated_string(line: usize) -> Self {
+        LexerError { line: line, kind: LexerErrorKind::UnterminatedString }
     }
 }
 
@@ -212,6 +222,19 @@ impl Iterator for Lexer<'_> {
                 }
                 ' ' | '\t' | '\r' | '\n' => {
                     continue;
+                }
+                '"' => {
+                    let line = self.line;
+                    let s = self.rest;
+                    let mut len = 0;
+                    loop {
+                        let Some(c) = self.advance() else {
+                            return Some(Err(LexerError::unterminated_string(line)));
+                        };
+                        len += c.len_utf8();
+                        if c != '"' { continue }
+                        break Token::String(s[..len-1].to_owned());
+                    }
                 }
                 _ => {
                     return Some(Err(LexerError::unexpected_character(self.line, c)));
