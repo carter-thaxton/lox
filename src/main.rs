@@ -20,11 +20,24 @@ fn main() {
                 String::new()
             });
 
+            let mut lexer_error = false;
             let lexer = Lexer::new(&file_contents);
-            for token in lexer {
-                println!("{}", token);
+            for result in lexer {
+                match result {
+                    Ok(token) => {
+                        println!("{}", token);
+                    },
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        lexer_error = true;
+                    },
+                }
             }
             println!("EOF  null");
+
+            if lexer_error {
+                std::process::exit(65);
+            }
         }
         _ => {
             writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
@@ -63,6 +76,37 @@ impl Display for Token {
     }
 }
 
+pub struct LexerError {
+    line: usize,
+    kind: LexerErrorKind,
+}
+
+pub enum LexerErrorKind {
+    UnrecognizedCharacter(char),
+}
+
+impl Display for LexerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "[line {}] Error: {}", self.line, self.kind)
+    }
+}
+
+impl Display for LexerErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            LexerErrorKind::UnrecognizedCharacter(c) => {
+                write!(f, "Unexpected character: {}", c)
+            }
+        }
+    }
+}
+
+impl LexerError {
+    pub fn unrecognized_character(line: usize, ch: char) -> Self {
+        LexerError { line: line, kind: LexerErrorKind::UnrecognizedCharacter(ch) }
+    }
+}
+
 pub struct Lexer<'a> {
     rest: &'a str,
 }
@@ -74,9 +118,9 @@ impl<'a> Lexer<'a> {
 }
 
 impl Iterator for Lexer<'_> {
-    type Item = Token;
+    type Item = Result<Token, LexerError>;
 
-    fn next(&mut self) -> Option<Token> {
+    fn next(&mut self) -> Option<Result<Token, LexerError>> {
         let mut chars = self.rest.chars();
         let c = chars.next()?;
         self.rest = chars.as_str();
@@ -93,10 +137,11 @@ impl Iterator for Lexer<'_> {
             ';' => Token::Semicolon,
             '*' => Token::Star,
             _ => {
-                return None;
+                // TODO: actually keep track of line number
+                return Some(Err(LexerError::unrecognized_character(1, c)));
             },
         };
 
-        Some(tok)
+        Some(Ok(tok))
     }
 }
