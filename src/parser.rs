@@ -20,14 +20,19 @@ impl<'a> Parser<'a> {
         Ok(AstNode::Expr(expr))
     }
 
+    fn parse_expr(&mut self) -> Result<Expr, Error> {
+        // TODO: handle the full hierarchy of precedence
+        self.parse_primary()
+    }
+
     fn parse_primary(&mut self) -> Result<Expr, Error> {
-        if self.matches(Token::Nil).is_some() {
+        if self.matches(Token::Nil) {
             return Ok(Expr::Literal(Literal::Nil));
         }
-        if self.matches(Token::False).is_some() {
+        if self.matches(Token::False) {
             return Ok(Expr::Literal(Literal::False));
         }
-        if self.matches(Token::True).is_some() {
+        if self.matches(Token::True) {
             return Ok(Expr::Literal(Literal::True));
         }
 
@@ -45,7 +50,11 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // TODO: handle other literals and grouping expressions
+        if self.matches(Token::LeftParen) {
+            let expr = self.parse_expr()?;
+            self.expect(Token::RightParen)?;
+            return Ok(Expr::Group(Box::new(expr)));
+        }
 
         unimplemented!("Handle errors")
     }
@@ -87,11 +96,12 @@ impl<'a> Parser<'a> {
     //     false
     // }
 
-    fn matches(&mut self, token: Token<'_>) -> Option<Token<'_>> {
+    fn matches(&mut self, token: Token<'_>) -> bool {
         if self.check(token) {
-            Some(self.advance())
+            self.advance();
+            true
         } else {
-            None
+            false
         }
     }
 
@@ -105,6 +115,15 @@ impl<'a> Parser<'a> {
     //         None
     //     }
     // }
+
+    fn expect(&mut self, token: Token<'_>) -> Result<(), Error> {
+        if self.check(token) {
+            self.advance();
+            Ok(())
+        } else {
+            unimplemented!("Handle errors");
+        }
+    }
 }
 
 pub enum AstNode {
@@ -159,6 +178,7 @@ impl Display for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Expr::Literal(literal) => literal.fmt(f),
+            Expr::Group(expr) => write!(f, "(group {})", expr),
             _ => {
                 unimplemented!()
             }
@@ -186,7 +206,7 @@ impl Display for Literal {
                 }
             }
             Literal::String(s) => {
-                write!(f, "{}", s)
+                write!(f, "{}", s)  // very bad format for literals.  should be quoted ""
             }
         }
     }
