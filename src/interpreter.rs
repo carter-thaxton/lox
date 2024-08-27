@@ -87,14 +87,12 @@ pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
         }
 
         Expr::BinaryExpr { op: Op::Mul, left, right } => {
-            let left = evaluate_to_number(left)?;
-            let right = evaluate_to_number(right)?;
+            let (left, right) = evaluate_to_numbers(left, right)?;
             Ok(Value::Number(left * right))
         }
 
         Expr::BinaryExpr { op: Op::Div, left, right } => {
-            let left = evaluate_to_number(left)?;
-            let right = evaluate_to_number(right)?;
+            let (left, right) = evaluate_to_numbers(left, right)?;
             Ok(Value::Number(left / right))
         }
 
@@ -115,9 +113,28 @@ pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
         }
 
         Expr::BinaryExpr { op: Op::Sub, left, right } => {
-            let left = evaluate_to_number(left)?;
-            let right = evaluate_to_number(right)?;
+            let (left, right) = evaluate_to_numbers(left, right)?;
             Ok(Value::Number(left - right))
+        }
+
+        Expr::BinaryExpr { op: Op::Lt, left, right } => {
+            let (left, right) = evaluate_to_numbers(left, right)?;
+            Ok((left < right).into())
+        }
+
+        Expr::BinaryExpr { op: Op::Le, left, right } => {
+            let (left, right) = evaluate_to_numbers(left, right)?;
+            Ok((left <= right).into())
+        }
+
+        Expr::BinaryExpr { op: Op::Gt, left, right } => {
+            let (left, right) = evaluate_to_numbers(left, right)?;
+            Ok((left > right).into())
+        }
+
+        Expr::BinaryExpr { op: Op::Ge, left, right } => {
+            let (left, right) = evaluate_to_numbers(left, right)?;
+            Ok((left >= right).into())
         }
 
         _ => Err(Error::runtime_error("Unexpected expression.")),
@@ -131,5 +148,16 @@ fn evaluate_to_number(expr: &Expr) -> Result<f64, Error<'_>> {
             Ok(n)
         }
         _ => Err(Error::runtime_error("Operand must be a number."))
+    }
+}
+
+fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr) -> Result<(f64, f64), Error<'a>> {
+    let left = evaluate(left)?;
+    let right = evaluate(right)?;
+    match (left, right) {
+        (Value::Number(left), Value::Number(right)) => {
+            Ok((left, right))
+        }
+        _ => Err(Error::runtime_error("Operands must be numbers."))
     }
 }
