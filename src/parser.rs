@@ -22,15 +22,47 @@ impl<'a> Parser<'a> {
 
     fn parse_expr(&mut self) -> Result<Expr, Error> {
         // TODO: handle the full hierarchy of precedence
-        self.parse_unary()
+        self.parse_term()
+    }
+
+    fn parse_term(&mut self) -> Result<Expr, Error> {
+        let mut left = self.parse_factor()?;
+
+        while let Some(tok) = self.matches_n(&[Token::Plus, Token::Minus]) {
+            let op = match tok {
+                Token::Plus => Op::Add,
+                Token::Minus => Op::Sub,
+                _ => unreachable!(),
+            };
+            let right = self.parse_factor()?;
+            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_factor(&mut self) -> Result<Expr, Error> {
+        let mut left = self.parse_unary()?;
+
+        while let Some(tok) = self.matches_n(&[Token::Star, Token::Slash]) {
+            let op = match tok {
+                Token::Star => Op::Mul,
+                Token::Slash => Op::Div,
+                _ => unreachable!(),
+            };
+            let right = self.parse_unary()?;
+            left = Expr::BinaryExpr { op, left: Box::new(left), right: Box::new(right) };
+        }
+
+        Ok(left)
     }
 
     fn parse_unary(&mut self) -> Result<Expr, Error> {
-        if self.matches(Token::Minus) {
+        if self.matches(Token::Minus).is_some() {
             let right = self.parse_unary()?;
             return Ok(Expr::UnaryExpr { op: Op::Neg, right: Box::new(right) });
         }
-        if self.matches(Token::Bang) {
+        if self.matches(Token::Bang).is_some() {
             let right = self.parse_unary()?;
             return Ok(Expr::UnaryExpr { op: Op::Not, right: Box::new(right) });
         }
@@ -39,13 +71,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary(&mut self) -> Result<Expr, Error> {
-        if self.matches(Token::Nil) {
+        if self.matches(Token::Nil).is_some() {
             return Ok(Expr::Literal(Literal::Nil));
         }
-        if self.matches(Token::False) {
+        if self.matches(Token::False).is_some() {
             return Ok(Expr::Literal(Literal::False));
         }
-        if self.matches(Token::True) {
+        if self.matches(Token::True).is_some() {
             return Ok(Expr::Literal(Literal::True));
         }
 
@@ -63,7 +95,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        if self.matches(Token::LeftParen) {
+        if self.matches(Token::LeftParen).is_some() {
             let expr = self.parse_expr()?;
             self.expect(Token::RightParen)?;
             return Ok(Expr::Group(Box::new(expr)));
@@ -88,6 +120,31 @@ impl<'a> Parser<'a> {
         false
     }
 
+    fn check_n(&mut self, tokens: &[Token<'_>]) -> bool {
+        if let Some(Ok(tok)) = self.lexer.peek() {
+            if tokens.contains(tok) {
+                return true
+            }
+        }
+        false
+    }
+
+    fn matches(&mut self, token: Token<'_>) -> Option<Token<'_>> {
+        if self.check(token) {
+            Some(self.advance())
+        } else {
+            None
+        }
+    }
+
+    fn matches_n(&mut self, tokens: &[Token<'_>]) -> Option<Token<'_>> {
+        if self.check_n(tokens) {
+            Some(self.advance())
+        } else {
+            None
+        }
+    }
+
     // fn check_p<P>(&mut self, pred: P) -> bool
     // where
     //     P: FnOnce(Token<'_>) -> bool
@@ -99,24 +156,6 @@ impl<'a> Parser<'a> {
     //     }
     //     false
     // }
-
-    // fn check_n(&mut self, tokens: &[Token<'_>]) -> bool {
-    //     if let Some(Ok(tok)) = self.lexer.peek() {
-    //         if tokens.contains(tok) {
-    //             return true
-    //         }
-    //     }
-    //     false
-    // }
-
-    fn matches(&mut self, token: Token<'_>) -> bool {
-        if self.check(token) {
-            self.advance();
-            true
-        } else {
-            false
-        }
-    }
 
     // fn matches_p<P>(&mut self, pred: P) -> Option<Token<'_>>
     // where
@@ -194,9 +233,7 @@ impl Display for Expr {
             Expr::Literal(literal) => literal.fmt(f),
             Expr::Group(expr) => write!(f, "(group {})", expr),
             Expr::UnaryExpr { op, right } => write!(f, "({} {})", op, right),
-            _ => {
-                unimplemented!()
-            }
+            Expr::BinaryExpr { op, left, right } => write!(f, "({} {} {})", op, left, right),
         }
     }
 }
