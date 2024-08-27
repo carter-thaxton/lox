@@ -1,4 +1,6 @@
+use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
+use crate::errors::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Token<'a> {
@@ -22,7 +24,7 @@ pub enum Token<'a> {
     GreaterEqual,
     Slash,
 
-    String(&'a str),
+    String(&'a str, &'a str),
     Number(f64, &'a str),
     Identifier(&'a str),
 
@@ -46,111 +48,111 @@ pub enum Token<'a> {
 }
 
 impl Display for Token<'_> {
-    #[rustfmt::skip]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{} {} {}", self.name(), self.lexeme(), self.value())
+    }
+}
+
+impl Token<'_> {
+    #[rustfmt::skip]
+    pub fn name(&self) -> &str {
         match self {
-            Token::LeftParen        => write!(f, "LEFT_PAREN ( null"),
-            Token::RightParen       => write!(f, "RIGHT_PAREN ) null"),
-            Token::LeftBrace        => write!(f, "LEFT_BRACE {{ null"),
-            Token::RightBrace       => write!(f, "RIGHT_BRACE }} null"),
-            Token::Comma            => write!(f, "COMMA , null"),
-            Token::Dot              => write!(f, "DOT . null"),
-            Token::Minus            => write!(f, "MINUS - null"),
-            Token::Plus             => write!(f, "PLUS + null"),
-            Token::Semicolon        => write!(f, "SEMICOLON ; null"),
-            Token::Star             => write!(f, "STAR * null"),
-            Token::Equal            => write!(f, "EQUAL = null"),
-            Token::EqualEqual       => write!(f, "EQUAL_EQUAL == null"),
-            Token::Bang             => write!(f, "BANG ! null"),
-            Token::BangEqual        => write!(f, "BANG_EQUAL != null"),
-            Token::Less             => write!(f, "LESS < null"),
-            Token::LessEqual        => write!(f, "LESS_EQUAL <= null"),
-            Token::Greater          => write!(f, "GREATER > null"),
-            Token::GreaterEqual     => write!(f, "GREATER_EQUAL >= null"),
-            Token::Slash            => write!(f, "SLASH / null"),
-            Token::String(s)        => write!(f, "STRING \"{}\" {}", s, s),
-            Token::Number(n, s)     => {
-                if *n == n.trunc() && !n.is_infinite() && !n.is_nan() {
-                    write!(f, "NUMBER {} {}.0", s, n)
+            Token::LeftParen        => "LEFT_PAREN",
+            Token::RightParen       => "RIGHT_PAREN",
+            Token::LeftBrace        => "LEFT_BRACE",
+            Token::RightBrace       => "RIGHT_BRACE",
+            Token::Comma            => "COMMA",
+            Token::Dot              => "DOT",
+            Token::Minus            => "MINUS",
+            Token::Plus             => "PLUS",
+            Token::Semicolon        => "SEMICOLON",
+            Token::Star             => "STAR",
+            Token::Equal            => "EQUAL",
+            Token::EqualEqual       => "EQUAL_EQUAL",
+            Token::Bang             => "BANG",
+            Token::BangEqual        => "BANG_EQUAL",
+            Token::Less             => "LESS",
+            Token::LessEqual        => "LESS_EQUAL",
+            Token::Greater          => "GREATER",
+            Token::GreaterEqual     => "GREATER_EQUAL",
+            Token::Slash            => "SLASH",
+            Token::String(_, _)     => "STRING",
+            Token::Number(_, _)     => "NUMBER",
+            Token::Identifier(_)    => "IDENTIFIER",
+            Token::And              => "AND",
+            Token::Class            => "CLASS",
+            Token::Else             => "ELSE",
+            Token::False            => "FALSE",
+            Token::For              => "FOR",
+            Token::Fun              => "FUN",
+            Token::If               => "IF",
+            Token::Nil              => "NIL",
+            Token::Or               => "OR",
+            Token::Print            => "PRINT",
+            Token::Return           => "RETURN",
+            Token::Super            => "SUPER",
+            Token::This             => "THIS",
+            Token::True             => "TRUE",
+            Token::Var              => "VAR",
+            Token::While            => "WHILE",
+        }
+    }
+
+    #[rustfmt::skip]
+    pub fn lexeme(&self) -> &str {
+        match self {
+            Token::LeftParen        => "(",
+            Token::RightParen       => ")",
+            Token::LeftBrace        => "{",
+            Token::RightBrace       => "}",
+            Token::Comma            => ",",
+            Token::Dot              => ".",
+            Token::Minus            => "-",
+            Token::Plus             => "+",
+            Token::Semicolon        => ";",
+            Token::Star             => "*",
+            Token::Equal            => "=",
+            Token::EqualEqual       => "==",
+            Token::Bang             => "!",
+            Token::BangEqual        => "!=",
+            Token::Less             => "<",
+            Token::LessEqual        => "<=",
+            Token::Greater          => ">",
+            Token::GreaterEqual     => ">=",
+            Token::Slash            => "/",
+            Token::Number(_, s)     => s,
+            Token::Identifier(s)    => s,
+            Token::String(_, s)     => s,
+            Token::And              => "and",
+            Token::Class            => "class",
+            Token::Else             => "else",
+            Token::False            => "false",
+            Token::For              => "for",
+            Token::Fun              => "fun",
+            Token::If               => "if",
+            Token::Nil              => "nil",
+            Token::Or               => "or",
+            Token::Print            => "print",
+            Token::Return           => "return",
+            Token::Super            => "super",
+            Token::This             => "this",
+            Token::True             => "true",
+            Token::Var              => "var",
+            Token::While            => "while",
+        }
+    }
+
+    pub fn value(&self) -> Cow<str> {
+        match self {
+            Token::Number(val, _) => {
+                if *val == val.trunc() && !val.is_infinite() && !val.is_nan() {
+                    format!("{}.0", val).into()
                 } else {
-                    write!(f, "NUMBER {} {}", s, n)
+                    format!("{}", val).into()
                 }
             }
-            Token::Identifier(s)    => write!(f, "IDENTIFIER {} null", s),
-            Token::And              => write!(f, "AND and null"),
-            Token::Class            => write!(f, "CLASS class null"),
-            Token::Else             => write!(f, "ELSE else null"),
-            Token::False            => write!(f, "FALSE false null"),
-            Token::For              => write!(f, "FOR for null"),
-            Token::Fun              => write!(f, "FUN fun null"),
-            Token::If               => write!(f, "IF if null"),
-            Token::Nil              => write!(f, "NIL nil null"),
-            Token::Or               => write!(f, "OR or null"),
-            Token::Print            => write!(f, "PRINT print null"),
-            Token::Return           => write!(f, "RETURN return null"),
-            Token::Super            => write!(f, "SUPER super null"),
-            Token::This             => write!(f, "THIS this null"),
-            Token::True             => write!(f, "TRUE true null"),
-            Token::Var              => write!(f, "VAR var null"),
-            Token::While            => write!(f, "WHILE while null"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LexerError {
-    line: usize,
-    kind: LexerErrorKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum LexerErrorKind {
-    UnexpectedCharacter(char),
-    UnterminatedString,
-    InvalidNumber(String),
-}
-
-impl Display for LexerError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "[line {}] Error: {}", self.line, self.kind)
-    }
-}
-
-impl Display for LexerErrorKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            LexerErrorKind::UnexpectedCharacter(c) => {
-                write!(f, "Unexpected character: {}", c)
-            }
-            LexerErrorKind::UnterminatedString => {
-                write!(f, "Unterminated string.")
-            }
-            LexerErrorKind::InvalidNumber(s) => {
-                write!(f, "Invalid number: {}", s)
-            }
-        }
-    }
-}
-
-impl LexerError {
-    pub fn unexpected_character(line: usize, ch: char) -> Self {
-        LexerError {
-            line: line,
-            kind: LexerErrorKind::UnexpectedCharacter(ch),
-        }
-    }
-
-    pub fn unterminated_string(line: usize) -> Self {
-        LexerError {
-            line: line,
-            kind: LexerErrorKind::UnterminatedString,
-        }
-    }
-
-    pub fn invalid_number(line: usize, s: &str) -> Self {
-        LexerError {
-            line: line,
-            kind: LexerErrorKind::InvalidNumber(s.to_owned()),
+            Token::String(val, _) => Cow::Borrowed(val),
+            _ => "null".into(),
         }
     }
 }
@@ -191,9 +193,9 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, LexerError>;
+    type Item = Result<Token<'a>, Error>;
 
-    fn next(&mut self) -> Option<Result<Token<'a>, LexerError>> {
+    fn next(&mut self) -> Option<Result<Token<'a>, Error>> {
         loop {
             let s = self.rest;
             let c = self.advance()?;
@@ -261,14 +263,15 @@ impl<'a> Iterator for Lexer<'a> {
                     let mut len = 1;
                     loop {
                         let Some(c) = self.advance() else {
-                            return Some(Err(LexerError::unterminated_string(line)));
+                            return Some(Err(Error::unterminated_string(line)));
                         };
                         len += c.len_utf8();
                         if c != '"' {
                             continue;
                         }
-                        let s = &s[1..len - 1];
-                        break Token::String(s);
+                        let lexeme = &s[..len];
+                        let val = &s[1..len - 1];
+                        break Token::String(val, lexeme);
                     }
                 }
                 '0'..='9' => {
@@ -295,14 +298,14 @@ impl<'a> Iterator for Lexer<'a> {
                         }
                     }
 
-                    let s = &s[..len];
-                    let n: f64 = match s.parse() {
-                        Ok(n) => n,
+                    let lexeme = &s[..len];
+                    let val: f64 = match lexeme.parse() {
+                        Ok(val) => val,
                         Err(_) => {
-                            return Some(Err(LexerError::invalid_number(self.line, s)));
+                            return Some(Err(Error::invalid_number(self.line, lexeme)));
                         }
                     };
-                    Token::Number(n, s)
+                    Token::Number(val, lexeme)
                 }
                 #[rustfmt::skip]
                 'A'..='Z' | 'a'..='z' | '_' => {
@@ -312,9 +315,9 @@ impl<'a> Iterator for Lexer<'a> {
                         len += c.len_utf8();
                         self.advance();
                     }
-                    let s = &s[..len];
+                    let lexeme = &s[..len];
 
-                    match s {
+                    match lexeme {
                         "and"       => Token::And,
                         "class"     => Token::Class,
                         "else"      => Token::Else,
@@ -331,11 +334,11 @@ impl<'a> Iterator for Lexer<'a> {
                         "true"      => Token::True,
                         "var"       => Token::Var,
                         "while"     => Token::While,
-                        _           => Token::Identifier(s),
+                        _           => Token::Identifier(lexeme),
                     }
                 }
                 _ => {
-                    return Some(Err(LexerError::unexpected_character(self.line, c)));
+                    return Some(Err(Error::unexpected_character(self.line, c)));
                 }
             };
 
