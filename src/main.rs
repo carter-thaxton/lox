@@ -3,13 +3,13 @@ use std::fs;
 
 pub mod ast;
 pub mod errors;
+pub mod interpreter;
 pub mod lexer;
 pub mod parser;
-pub mod interpreter;
 
+use interpreter::evaluate;
 use lexer::Lexer;
 use parser::Parser;
-use interpreter::evaluate;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -63,23 +63,25 @@ fn main() {
         "evaluate" => {
             let mut parser = Parser::new(&file_contents);
 
-            match parser.parse_expr() {
-                Ok(expr) => {
-                    let result = evaluate(&expr);
+            while !parser.at_eof() {
+                match parser.parse_expr() {
+                    Ok(expr) => {
+                        let result = evaluate(&expr);
 
-                    match result {
-                        Ok(value) => {
-                            println!("{}", value);
-                        }
-                        Err(err) => {
-                            eprintln!("{}", err);
-                            std::process::exit(70);
+                        match result {
+                            Ok(value) => {
+                                println!("{}", value);
+                            }
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                std::process::exit(70);
+                            }
                         }
                     }
-                }
-                Err(err) => {
-                    eprintln!("{}", err);
-                    std::process::exit(65);
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        std::process::exit(65);
+                    }
                 }
             }
         }

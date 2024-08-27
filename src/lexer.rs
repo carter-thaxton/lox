@@ -62,7 +62,13 @@ pub enum TokenKind<'a> {
 
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{} {} {}", self.kind.name(), self.span.lexeme, self.kind.value())
+        write!(
+            f,
+            "{} {} {}",
+            self.kind.name(),
+            self.span.lexeme,
+            self.kind.value()
+        )
     }
 }
 
@@ -155,10 +161,6 @@ impl<'a> Lexer<'a> {
             lexeme_len: 0,
         }
     }
-
-    // fn at_eof(&self) -> bool {
-    //     self.rest.is_empty()
-    // }
 
     fn advance(&mut self) -> Option<char> {
         let mut chars = self.rest.chars();

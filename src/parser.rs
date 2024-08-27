@@ -14,6 +14,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn at_eof(&mut self) -> bool {
+        self.lexer.peek().is_none()
+    }
+
     pub fn parse(mut self) -> Result<AstNode, Error<'a>> {
         let expr = self.parse_expr()?;
         Ok(AstNode::Expr(expr))
@@ -188,7 +192,9 @@ impl<'a> Parser<'a> {
     fn peek_span(&mut self) -> Option<&Span<'a>> {
         match self.lexer.peek() {
             Some(Ok(token)) => Some(&token.span),
-            Some(Err(Error { span: Some(span), .. })) => Some(&span),
+            Some(Err(Error {
+                span: Some(span), ..
+            })) => Some(&span),
             _ => None,
         }
     }
