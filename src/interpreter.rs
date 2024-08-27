@@ -53,8 +53,9 @@ impl Value {
 pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
   match expr {
     Expr::Literal(literal) => Ok(literal.into()),
-    _ => Err(Error::runtime_error("Unexpected expression.")),
+    Expr::Group(expr) => evaluate(expr),
 
+    _ => Err(Error::runtime_error("Unexpected expression.")),
   }
 
   // Err(Error::runtime_error("Operands must be numbers."))
