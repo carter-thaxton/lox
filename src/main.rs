@@ -54,11 +54,11 @@ impl Display for Token {
             Token::LeftBrace    => write!(f, "LEFT_BRACE {{ null"),
             Token::RightBrace   => write!(f, "RIGHT_BRACE }} null"),
             Token::Comma        => write!(f, "COMMA , null"),
-            Token::Dot          => write!(f, "DOT , null"),
-            Token::Minus        => write!(f, "MINUS , null"),
-            Token::Plus         => write!(f, "PLUS , null"),
-            Token::Semicolon    => write!(f, "SEMICOLON , null"),
-            Token::Star         => write!(f, "STAR , null"),
+            Token::Dot          => write!(f, "DOT . null"),
+            Token::Minus        => write!(f, "MINUS - null"),
+            Token::Plus         => write!(f, "PLUS + null"),
+            Token::Semicolon    => write!(f, "SEMICOLON ; null"),
+            Token::Star         => write!(f, "STAR * null"),
         }
     }
 }
