@@ -57,6 +57,8 @@ pub enum Token {
     Plus,
     Semicolon,
     Star,
+    Equal,
+    EqualEqual,
 }
 
 impl Display for Token {
@@ -72,6 +74,8 @@ impl Display for Token {
             Token::Plus         => write!(f, "PLUS + null"),
             Token::Semicolon    => write!(f, "SEMICOLON ; null"),
             Token::Star         => write!(f, "STAR * null"),
+            Token::Equal        => write!(f, "EQUAL = null"),
+            Token::EqualEqual   => write!(f, "EQUAL_EQUAL == null"),
         }
     }
 }
@@ -82,7 +86,7 @@ pub struct LexerError {
 }
 
 pub enum LexerErrorKind {
-    UnrecognizedCharacter(char),
+    UnexpectedCharacter(char),
 }
 
 impl Display for LexerError {
@@ -94,7 +98,7 @@ impl Display for LexerError {
 impl Display for LexerErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            LexerErrorKind::UnrecognizedCharacter(c) => {
+            LexerErrorKind::UnexpectedCharacter(c) => {
                 write!(f, "Unexpected character: {}", c)
             }
         }
@@ -102,8 +106,8 @@ impl Display for LexerErrorKind {
 }
 
 impl LexerError {
-    pub fn unrecognized_character(line: usize, ch: char) -> Self {
-        LexerError { line: line, kind: LexerErrorKind::UnrecognizedCharacter(ch) }
+    pub fn unexpected_character(line: usize, ch: char) -> Self {
+        LexerError { line: line, kind: LexerErrorKind::UnexpectedCharacter(ch) }
     }
 }
 
@@ -115,15 +119,24 @@ impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Lexer { rest: input }
     }
+
+    fn advance(&mut self) -> Option<char> {
+        let mut chars = self.rest.chars();
+        let c = chars.next()?;
+        self.rest = chars.as_str();
+        Some(c)
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.rest.chars().next()
+    }
 }
 
 impl Iterator for Lexer<'_> {
     type Item = Result<Token, LexerError>;
 
     fn next(&mut self) -> Option<Result<Token, LexerError>> {
-        let mut chars = self.rest.chars();
-        let c = chars.next()?;
-        self.rest = chars.as_str();
+        let c = self.advance()?;
 
         let tok = match c {
             '(' => Token::LeftParen,
@@ -136,9 +149,17 @@ impl Iterator for Lexer<'_> {
             '+' => Token::Plus,
             ';' => Token::Semicolon,
             '*' => Token::Star,
+            '=' => {
+                if self.peek() == Some('=') {
+                    self.advance().unwrap();
+                    Token::EqualEqual
+                } else {
+                    Token::Equal
+                }
+            }
             _ => {
                 // TODO: actually keep track of line number
-                return Some(Err(LexerError::unrecognized_character(1, c)));
+                return Some(Err(LexerError::unexpected_character(1, c)));
             },
         };
 
