@@ -61,6 +61,10 @@ pub enum Token {
     EqualEqual,
     Bang,
     BangEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
 }
 
 impl Display for Token {
@@ -80,6 +84,10 @@ impl Display for Token {
             Token::EqualEqual   => write!(f, "EQUAL_EQUAL == null"),
             Token::Bang         => write!(f, "BANG ! null"),
             Token::BangEqual    => write!(f, "BANG_EQUAL != null"),
+            Token::Less         => write!(f, "LESS < null"),
+            Token::LessEqual    => write!(f, "LESS_EQUAL <= null"),
+            Token::Greater      => write!(f, "GREATER > null"),
+            Token::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
         }
     }
 }
@@ -167,6 +175,22 @@ impl Iterator for Lexer<'_> {
                     Token::BangEqual
                 } else {
                     Token::Bang
+                }
+            }
+            '<' => {
+                if self.peek() == Some('=') {
+                    self.advance().unwrap();
+                    Token::LessEqual
+                } else {
+                    Token::Less
+                }
+            }
+            '>' => {
+                if self.peek() == Some('=') {
+                    self.advance().unwrap();
+                    Token::GreaterEqual
+                } else {
+                    Token::Greater
                 }
             }
             _ => {
