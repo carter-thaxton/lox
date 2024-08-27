@@ -1,12 +1,15 @@
 use std::env;
 use std::fs;
 
+pub mod ast;
 pub mod errors;
 pub mod lexer;
 pub mod parser;
+pub mod interpreter;
 
 use lexer::Lexer;
 use parser::Parser;
+use interpreter::evaluate;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -58,12 +61,21 @@ fn main() {
             }
         }
         "evaluate" => {
-            let parser = Parser::new(&file_contents);
+            let mut parser = Parser::new(&file_contents);
 
-            match parser.parse() {
-                Ok(ast) => {
-                    // TODO: evaluate AST
-                    println!("{}", ast);
+            match parser.parse_expr() {
+                Ok(expr) => {
+                    let result = evaluate(&expr);
+
+                    match result {
+                        Ok(value) => {
+                            println!("{}", value);
+                        }
+                        Err(err) => {
+                            eprintln!("{}", err);
+                            std::process::exit(70);
+                        }
+                    }
                 }
                 Err(err) => {
                     eprintln!("{}", err);

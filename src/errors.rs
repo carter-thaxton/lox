@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error<'a> {
     pub kind: ErrorKind,
-    pub span: Span<'a>,
+    pub span: Option<Span<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,17 +14,22 @@ pub enum ErrorKind {
     UnterminatedString,
     InvalidNumber(String),
     ParserError(String),
+    RuntimeError(String),
 }
 
 impl Display for Error<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "[line {}] Error{}: {}",
-            self.span.line,
-            self.at_message(),
-            self.kind
-        )
+        if let Some(span) = self.span {
+            write!(
+                f,
+                "[line {}] Error{}: {}",
+                span.line,
+                self.at_message(),
+                self.kind
+            )
+        } else {
+            write!(f, "{}", self.kind)
+        }
     }
 }
 
@@ -43,6 +48,9 @@ impl Display for ErrorKind {
             ErrorKind::ParserError(msg) => {
                 write!(f, "{}", msg)
             }
+            ErrorKind::RuntimeError(msg) => {
+                write!(f, "{}", msg)
+            }
         }
     }
 }
@@ -52,34 +60,48 @@ impl<'a> Error<'a> {
         let ch = span.lexeme.chars().next().expect("Should not be at EOF");
         Error {
             kind: ErrorKind::UnexpectedCharacter(ch),
-            span,
+            span: Some(span),
         }
     }
 
     pub fn unterminated_string(span: Span<'a>) -> Self {
         Error {
             kind: ErrorKind::UnterminatedString,
-            span,
+            span: Some(span),
         }
     }
 
     pub fn invalid_number(span: Span<'a>) -> Self {
         Error {
             kind: ErrorKind::InvalidNumber(span.lexeme.to_string()),
-            span,
+            span: Some(span),
         }
     }
 
     pub fn parser_error(span: Span<'a>, message: &str) -> Self {
         Error {
             kind: ErrorKind::ParserError(message.to_owned()),
-            span: span,
+            span: Some(span),
         }
     }
 
+    pub fn runtime_error(message: &str) -> Self {
+        Error {
+            kind: ErrorKind::RuntimeError(message.to_owned()),
+            span: None,
+        }
+    }
+
+    // pub fn is_runtime_error(&self) -> bool {
+    //     match self.kind {
+    //         ErrorKind::RuntimeError(_) => true,
+    //         _ => false,
+    //     }
+    // }
+
     fn at_message(&self) -> Cow<str> {
         let span = match &self.kind {
-            ErrorKind::ParserError(_) => self.span,
+            ErrorKind::ParserError(_) => self.span.expect("ParserError should have a span"),
             _ => {
                 return "".into();
             }
