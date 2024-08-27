@@ -186,7 +186,7 @@ impl Display for Literal {
                 }
             }
             Literal::String(s) => {
-                write!(f, "\"{}\"", s)
+                write!(f, "{}", s)
             }
         }
     }
