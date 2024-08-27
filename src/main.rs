@@ -46,7 +46,8 @@ fn main() {
     }
 }
 
-pub enum Token {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Token<'a> {
     LeftParen,
     RightParen,
     LeftBrace,
@@ -66,10 +67,10 @@ pub enum Token {
     Greater,
     GreaterEqual,
     Slash,
-    String(String),
+    String(&'a str),
 }
 
-impl Display for Token {
+impl Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Token::LeftParen    => write!(f, "LEFT_PAREN ( null"),
@@ -96,11 +97,13 @@ impl Display for Token {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LexerError {
     line: usize,
     kind: LexerErrorKind,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LexerErrorKind {
     UnexpectedCharacter(char),
     UnterminatedString,
@@ -135,6 +138,7 @@ impl LexerError {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     rest: &'a str,
     line: usize,
@@ -160,10 +164,10 @@ impl<'a> Lexer<'a> {
     }
 }
 
-impl Iterator for Lexer<'_> {
-    type Item = Result<Token, LexerError>;
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Result<Token<'a>, LexerError>;
 
-    fn next(&mut self) -> Option<Result<Token, LexerError>> {
+    fn next(&mut self) -> Option<Result<Token<'a>, LexerError>> {
         loop {
             let c = self.advance()?;
 
@@ -233,7 +237,7 @@ impl Iterator for Lexer<'_> {
                         };
                         len += c.len_utf8();
                         if c != '"' { continue }
-                        break Token::String(s[..len-1].to_owned());
+                        break Token::String(&s[..len-1]);
                     }
                 }
                 _ => {
