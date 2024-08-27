@@ -15,13 +15,26 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(mut self) -> Result<AstNode, Error> {
-        let expr = self.parse_primary()?;
+        let expr = self.parse_expr()?;
 
         Ok(AstNode::Expr(expr))
     }
 
     fn parse_expr(&mut self) -> Result<Expr, Error> {
         // TODO: handle the full hierarchy of precedence
+        self.parse_unary()
+    }
+
+    fn parse_unary(&mut self) -> Result<Expr, Error> {
+        if self.matches(Token::Minus) {
+            let right = self.parse_unary()?;
+            return Ok(Expr::UnaryExpr { op: Op::Neg, right: Box::new(right) });
+        }
+        if self.matches(Token::Bang) {
+            let right = self.parse_unary()?;
+            return Ok(Expr::UnaryExpr { op: Op::Not, right: Box::new(right) });
+        }
+
         self.parse_primary()
     }
 
@@ -157,7 +170,8 @@ pub enum Op {
     Sub,
     Mul,
     Div,
-
+    Neg,
+    Not,
     Eq,
     Ne,
     Lt,
@@ -179,6 +193,7 @@ impl Display for Expr {
         match self {
             Expr::Literal(literal) => literal.fmt(f),
             Expr::Group(expr) => write!(f, "(group {})", expr),
+            Expr::UnaryExpr { op, right } => write!(f, "({} {})", op, right),
             _ => {
                 unimplemented!()
             }
@@ -209,5 +224,25 @@ impl Display for Literal {
                 write!(f, "{}", s)  // very bad format for literals.  should be quoted ""
             }
         }
+    }
+}
+
+impl Display for Op {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let s = match self {
+            Op::Add => "+",
+            Op::Sub => "-",
+            Op::Mul => "*",
+            Op::Div => "/",
+            Op::Not => "!",
+            Op::Neg => "-",
+            Op::Eq => "==",
+            Op::Ne => "!=",
+            Op::Lt => "<",
+            Op::Le => "<=",
+            Op::Gt => ">",
+            Op::Ge => ">=",
+        };
+        write!(f, "{}", s)
     }
 }
