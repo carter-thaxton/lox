@@ -4,8 +4,8 @@ use crate::lexer::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error {
-    line: usize,
-    kind: ErrorKind,
+    pub line: usize,
+    pub kind: ErrorKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]

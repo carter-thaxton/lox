@@ -165,7 +165,7 @@ impl<'a> Parser<'a> {
     fn peek_line(&mut self) -> Option<usize> {
         match self.lexer.peek() {
             Some(Ok((_token, line))) => Some(*line),
-            Some(Err(_err)) => None,
+            Some(Err(err)) => Some(err.line),
             None => None,
         }
     }
