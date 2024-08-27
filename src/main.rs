@@ -1,6 +1,5 @@
 use std::env;
 use std::fs;
-use std::io::{self, Write};
 
 pub mod errors;
 pub mod lexer;
@@ -12,20 +11,20 @@ use parser::Parser;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
-        writeln!(io::stderr(), "Usage: {} tokenize <filename>", args[0]).unwrap();
-        return;
+        eprintln!("Usage: {} tokenize <filename>", args[0]);
+        std::process::exit(2);
     }
 
     let command = &args[1];
     let filename = &args[2];
 
+    let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+        eprintln!("Failed to read file {}", filename);
+        String::new()
+    });
+
     match command.as_str() {
         "tokenize" => {
-            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
-                String::new()
-            });
-
             let mut lexer_error = false;
             let lexer = Lexer::new(&file_contents);
             for result in lexer {
@@ -46,11 +45,6 @@ fn main() {
             }
         }
         "parse" => {
-            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
-                String::new()
-            });
-
             let parser = Parser::new(&file_contents);
 
             match parser.parse() {
@@ -63,9 +57,23 @@ fn main() {
                 }
             }
         }
+        "evaluate" => {
+            let parser = Parser::new(&file_contents);
+
+            match parser.parse() {
+                Ok(ast) => {
+                    // TODO: evaluate AST
+                    println!("{}", ast);
+                }
+                Err(err) => {
+                    eprintln!("{}", err);
+                    std::process::exit(65);
+                }
+            }
+        }
         _ => {
-            writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
-            return;
+            eprintln!("Unknown command: {}", command);
+            std::process::exit(2);
         }
     }
 }
