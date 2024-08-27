@@ -59,6 +59,8 @@ pub enum Token {
     Star,
     Equal,
     EqualEqual,
+    Bang,
+    BangEqual,
 }
 
 impl Display for Token {
@@ -76,6 +78,8 @@ impl Display for Token {
             Token::Star         => write!(f, "STAR * null"),
             Token::Equal        => write!(f, "EQUAL = null"),
             Token::EqualEqual   => write!(f, "EQUAL_EQUAL == null"),
+            Token::Bang         => write!(f, "BANG ! null"),
+            Token::BangEqual    => write!(f, "BANG_EQUAL != null"),
         }
     }
 }
@@ -155,6 +159,14 @@ impl Iterator for Lexer<'_> {
                     Token::EqualEqual
                 } else {
                     Token::Equal
+                }
+            }
+            '!' => {
+                if self.peek() == Some('=') {
+                    self.advance().unwrap();
+                    Token::BangEqual
+                } else {
+                    Token::Bang
                 }
             }
             _ => {
