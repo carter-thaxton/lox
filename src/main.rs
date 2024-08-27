@@ -67,9 +67,28 @@ pub enum Token<'a> {
     Greater,
     GreaterEqual,
     Slash,
+
     String(&'a str),
     Number(f64, &'a str),
     Identifier(&'a str),
+
+    // keywords
+    And,
+    Class,
+    Else,
+    False,
+    For,
+    Fun,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
 }
 
 impl Display for Token<'_> {
@@ -103,6 +122,22 @@ impl Display for Token<'_> {
                 }
             }
             Token::Identifier(s)    => write!(f, "IDENTIFIER {} null", s),
+            Token::And              => write!(f, "AND and null"),
+            Token::Class            => write!(f, "CLASS class null"),
+            Token::Else             => write!(f, "ELSE else null"),
+            Token::False            => write!(f, "FALSE false null"),
+            Token::For              => write!(f, "FOR for null"),
+            Token::Fun              => write!(f, "FUN fun null"),
+            Token::If               => write!(f, "IF if null"),
+            Token::Nil              => write!(f, "NIL nil null"),
+            Token::Or               => write!(f, "OR or null"),
+            Token::Print            => write!(f, "PRINT print null"),
+            Token::Return           => write!(f, "RETURN return null"),
+            Token::Super            => write!(f, "SUPER super null"),
+            Token::This             => write!(f, "THIS this null"),
+            Token::True             => write!(f, "TRUE true null"),
+            Token::Var              => write!(f, "VAR var null"),
+            Token::While            => write!(f, "WHILE while null"),
         }
     }
 }
@@ -299,7 +334,27 @@ impl<'a> Iterator for Lexer<'a> {
                         len += c.len_utf8();
                         self.advance();
                     }
-                    Token::Identifier(&s[..len])
+                    let s = &s[..len];
+
+                    match s {
+                        "and"       => Token::And,
+                        "class"     => Token::Class,
+                        "else"      => Token::Else,
+                        "false"     => Token::False,
+                        "for"       => Token::For,
+                        "fun"       => Token::Fun,
+                        "if"        => Token::If,
+                        "nil"       => Token::Nil,
+                        "or"        => Token::Or,
+                        "print"     => Token::Print,
+                        "return"    => Token::Return,
+                        "super"     => Token::Super,
+                        "this"      => Token::This,
+                        "true"      => Token::True,
+                        "var"       => Token::Var,
+                        "while"     => Token::While,
+                        _           => Token::Identifier(s),
+                    }
                 }
                 _ => {
                     return Some(Err(LexerError::unexpected_character(self.line, c)));
