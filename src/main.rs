@@ -38,6 +38,12 @@ pub enum Token {
     RightParen,
     LeftBrace,
     RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Star,
 }
 
 impl Display for Token {
@@ -47,6 +53,12 @@ impl Display for Token {
             Token::RightParen   => write!(f, "RIGHT_PAREN ) null"),
             Token::LeftBrace    => write!(f, "LEFT_BRACE {{ null"),
             Token::RightBrace   => write!(f, "RIGHT_BRACE }} null"),
+            Token::Comma        => write!(f, "COMMA , null"),
+            Token::Dot          => write!(f, "DOT , null"),
+            Token::Minus        => write!(f, "MINUS , null"),
+            Token::Plus         => write!(f, "PLUS , null"),
+            Token::Semicolon    => write!(f, "SEMICOLON , null"),
+            Token::Star         => write!(f, "STAR , null"),
         }
     }
 }
@@ -65,14 +77,21 @@ impl Iterator for Lexer<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
-        let c = self.rest.chars().next()?;
-        self.rest = &self.rest[1..];
+        let mut chars = self.rest.chars();
+        let c = chars.next()?;
+        self.rest = chars.as_str();
 
         let tok = match c {
             '(' => Token::LeftParen,
             ')' => Token::RightParen,
             '{' => Token::LeftBrace,
             '}' => Token::RightBrace,
+            ',' => Token::Comma,
+            '.' => Token::Dot,
+            '-' => Token::Minus,
+            '+' => Token::Plus,
+            ';' => Token::Semicolon,
+            '*' => Token::Star,
             _ => {
                 return None;
             },
