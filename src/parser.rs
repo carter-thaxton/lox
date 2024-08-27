@@ -8,6 +8,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+
     pub fn new(input: &'a str) -> Self {
         Parser {
             lexer: Lexer::new(input).peekable(),
@@ -18,10 +19,38 @@ impl<'a> Parser<'a> {
         self.lexer.peek().is_none()
     }
 
-    pub fn parse(mut self) -> Result<AstNode, Error<'a>> {
-        let expr = self.parse_expr()?;
-        Ok(AstNode::Expr(expr))
+    pub fn parse(mut self) -> Result<Program, Error<'a>> {
+        let mut program = Vec::new();
+
+        while !self.at_eof() {
+            let stmt = self.parse_stmt()?;
+            program.push(stmt);
+        }
+
+        Ok(program)
     }
+
+
+    //
+    // statements
+    //
+
+    fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
+        if self.matches(TokenKind::Print).is_some() {
+            let expr = self.parse_expr()?;
+            self.expect(TokenKind::Semicolon, "Expect ';' after value.")?;
+            return Ok(Stmt::Print(Box::new(expr)));
+        }
+
+        let expr = self.parse_expr()?;
+        self.expect(TokenKind::Semicolon, "Expect ';' after expresssion.")?;
+        Ok(Stmt::Expr(Box::new(expr)))
+    }
+
+
+    //
+    // expressions
+    //
 
     pub fn parse_expr(&mut self) -> Result<Expr, Error<'a>> {
         self.parse_equality()
@@ -31,7 +60,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_comparison()?;
 
         while let Some(tok) = self.matches_n(&[TokenKind::EqualEqual, TokenKind::BangEqual]) {
-            let op = match tok {
+            let op = match tok.kind {
                 TokenKind::EqualEqual => Op::Eq,
                 TokenKind::BangEqual => Op::Ne,
                 _ => unreachable!(),
@@ -56,7 +85,7 @@ impl<'a> Parser<'a> {
             TokenKind::Greater,
             TokenKind::GreaterEqual,
         ]) {
-            let op = match tok {
+            let op = match tok.kind {
                 TokenKind::Less => Op::Lt,
                 TokenKind::LessEqual => Op::Le,
                 TokenKind::Greater => Op::Gt,
@@ -78,7 +107,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_factor()?;
 
         while let Some(tok) = self.matches_n(&[TokenKind::Plus, TokenKind::Minus]) {
-            let op = match tok {
+            let op = match tok.kind {
                 TokenKind::Plus => Op::Add,
                 TokenKind::Minus => Op::Sub,
                 _ => unreachable!(),
@@ -98,7 +127,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_unary()?;
 
         while let Some(tok) = self.matches_n(&[TokenKind::Star, TokenKind::Slash]) {
-            let op = match tok {
+            let op = match tok.kind {
                 TokenKind::Star => Op::Mul,
                 TokenKind::Slash => Op::Div,
                 _ => unreachable!(),
@@ -161,24 +190,22 @@ impl<'a> Parser<'a> {
 
         if self.matches(TokenKind::LeftParen).is_some() {
             let expr = self.parse_expr()?;
-            self.expect(TokenKind::RightParen)?;
+            self.expect(TokenKind::RightParen, "Expect closing ')'.")?;
             return Ok(Expr::Group(Box::new(expr)));
         }
 
         Err(self.parser_error("Expect expression."))
     }
 
-    fn parser_error(&mut self, message: &str) -> Error<'a> {
-        let span = self.peek_span().expect("Should not be at EOF").clone();
-        Error::parser_error(span, message)
-    }
+    //
+    // helpers
+    //
 
-    fn advance(&mut self) -> TokenKind<'_> {
+    fn advance(&mut self) -> Token<'a> {
         self.lexer
             .next()
             .expect("Should not be at EOF")
             .expect("Should not produce a lexer error")
-            .kind
     }
 
     fn peek(&mut self) -> Option<Result<&TokenKind<'a>, &Error<'a>>> {
@@ -217,7 +244,7 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn matches(&mut self, token: TokenKind<'_>) -> Option<TokenKind<'_>> {
+    fn matches(&mut self, token: TokenKind<'_>) -> Option<Token<'_>> {
         if self.check(token) {
             Some(self.advance())
         } else {
@@ -225,7 +252,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn matches_n(&mut self, tokens: &[TokenKind<'_>]) -> Option<TokenKind<'_>> {
+    fn matches_n(&mut self, tokens: &[TokenKind<'_>]) -> Option<Token<'_>> {
         if self.check_n(tokens) {
             Some(self.advance())
         } else {
@@ -256,12 +283,16 @@ impl<'a> Parser<'a> {
     //     }
     // }
 
-    fn expect(&mut self, token: TokenKind<'_>) -> Result<(), Error<'a>> {
+    fn parser_error(&mut self, message: &str) -> Error<'a> {
+        let span = self.peek_span().expect("Should not be at EOF").clone();
+        Error::parser_error(span, message)
+    }
+
+    fn expect(&mut self, token: TokenKind<'_>, message: &str) -> Result<Token<'a>, Error<'a>> {
         if self.check(token) {
-            self.advance();
-            Ok(())
+            Ok(self.advance())
         } else {
-            unimplemented!("Handle errors");
+            Err(self.parser_error(message))
         }
     }
 }

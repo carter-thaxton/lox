@@ -188,3 +188,24 @@ fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr) -> Result<(f64, f64)
         _ => Err(Error::runtime_error("Operands must be numbers."))
     }
 }
+
+
+pub fn run(program: &Program) -> Result<(), Error<'_>> {
+    for stmt in program {
+        execute(stmt)?;
+    }
+    Ok(())
+}
+
+fn execute(stmt: &Stmt) -> Result<(), Error<'_>> {
+    match stmt {
+        Stmt::Expr(expr) => {
+            evaluate(expr)?;
+        }
+        Stmt::Print(expr) => {
+            let val = evaluate(expr)?;
+            println!("{}", val);
+        }
+    }
+    Ok(())
+}

@@ -1,7 +1,10 @@
 use std::fmt::{Display, Formatter};
 
-pub enum AstNode {
-    Expr(Expr),
+pub type Program = Vec<Stmt>;
+
+pub enum Stmt {
+    Expr(Box<Expr>),
+    Print(Box<Expr>),
 }
 
 pub enum Expr {
@@ -39,14 +42,6 @@ pub enum Op {
     Ge,
     Eq,
     Ne,
-}
-
-impl Display for AstNode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            AstNode::Expr(expr) => expr.fmt(f),
-        }
-    }
 }
 
 impl Display for Expr {

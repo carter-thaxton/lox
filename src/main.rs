@@ -7,7 +7,7 @@ pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 
-use interpreter::evaluate;
+use interpreter::{evaluate, run};
 use lexer::Lexer;
 use parser::Parser;
 
@@ -48,15 +48,17 @@ fn main() {
             }
         }
         "parse" => {
-            let parser = Parser::new(&file_contents);
+            let mut parser = Parser::new(&file_contents);
 
-            match parser.parse() {
-                Ok(ast) => {
-                    println!("{}", ast);
-                }
-                Err(err) => {
-                    eprintln!("{}", err);
-                    std::process::exit(65);
+            while !parser.at_eof() {
+                match parser.parse_expr() {
+                    Ok(expr) => {
+                        println!("{}", expr);
+                    }
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        std::process::exit(65);
+                    }
                 }
             }
         }
@@ -82,6 +84,24 @@ fn main() {
                         eprintln!("{}", err);
                         std::process::exit(65);
                     }
+                }
+            }
+        }
+        "run" => {
+            let parser = Parser::new(&file_contents);
+            let result = parser.parse();
+
+            match result {
+                Ok(program) => {
+                    let result = run(&program);
+                    if let Err(err) = result {
+                        eprintln!("{}", err);
+                        std::process::exit(70);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("{}", err);
+                    std::process::exit(65);
                 }
             }
         }
