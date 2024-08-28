@@ -5,6 +5,7 @@ use std::iter::Peekable;
 
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
+    last_line: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -12,6 +13,7 @@ impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Self {
         Parser {
             lexer: Lexer::new(input).peekable(),
+            last_line: 1,
         }
     }
 
@@ -252,24 +254,31 @@ impl<'a> Parser<'a> {
     }
 
     // peek ahead without advancing to the next available token span, useful for reporting parser errors
-    // returns None at EOF, and the next Span otherwise
+    // returns None at EOF
     fn peek_span(&mut self) -> Option<&Span<'a>> {
         match self.lexer.peek() {
             Some(Ok(token)) => Some(&token.span),
             Some(Err(Error {
                 span: Some(span), ..
-            })) => Some(&span),
-            _ => None,
+            })) => Some(span),
+            _ => {
+                None
+            }
         }
     }
 
     // move to the next token, returning the token
     // panics if at EOF or if a lexing error occurs - should use the various peek and check methods first, to be sure it will succeed
+    // keeps track of last-seen line number, for errors at EOF
     fn advance(&mut self) -> Token<'a> {
-        self.lexer
+        let token = self.lexer
             .next()
             .expect("Should not be at EOF")
-            .expect("Should not produce a lexer error")
+            .expect("Should not produce a lexer error");
+
+        self.last_line = token.span.line;
+
+        token
     }
 
     // peeks ahead without advancing, to see if the next token matches the given kind
@@ -292,9 +301,13 @@ impl<'a> Parser<'a> {
     }
 
     // create a parser error referring to the span of the next token, with the given message to match the book
+    // at EOF, constructs a dummy span using the last seen line number
     fn parser_error(&mut self, message: &str) -> Error<'a> {
-        let span = self.peek_span().expect("Should not be at EOF").clone();
-        Error::parser_error(span, message)
+        if let Some(span) = self.peek_span() {
+            Error::parser_error(*span, message)
+        } else {
+            Error::parser_error(Span::dummy_for_line(self.last_line), message)
+        }
     }
 
     // like matches, but produces a parser error if it doesn't match

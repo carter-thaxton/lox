@@ -15,6 +15,16 @@ pub struct Span<'a> {
     pub lexeme: &'a str,
 }
 
+impl Span<'_> {
+    pub fn dummy_for_line(line: usize) -> Self {
+        Span {
+            line: line,
+            col: 0,
+            lexeme: ""
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind<'a> {
     LeftParen,
