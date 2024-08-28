@@ -82,7 +82,7 @@ pub fn evaluate<'a>(expr: &'a Expr, env: &Environment) -> Result<Value, Error<'a
             if let Some(val) = env.get(name) {
                 Ok(val.clone())
             } else {
-                Err(Error::runtime_error(format!("Variable not found: {}", name)))
+                Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
             }
         }
 
