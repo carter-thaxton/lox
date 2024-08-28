@@ -166,11 +166,11 @@ pub fn evaluate<'a>(expr: &'a Expr, env: &mut Environment) -> Result<Value, Erro
 
         Expr::Assign { name, right } => {
             let right = evaluate(right, env)?;
-            if !env.is_defined(name) {
-                return Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
+            if env.assign(name, right.clone()) {
+                Ok(right)
+            } else {
+                Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
             }
-            env.set(name, right.clone());
-            Ok(right)
         }
 
         _ => Err(Error::runtime_error("Unexpected expression.")),
@@ -209,28 +209,67 @@ fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr, env: &mut Environmen
     }
 }
 
-
 pub struct Environment {
-    values: HashMap<String, Value>,
+    scopes: Vec<HashMap<String, Value>>,
 }
 
 impl Environment {
+    // creates a new environment in the outer-most scope
     pub fn new() -> Self {
         Environment {
-            values: HashMap::new()
+            scopes: vec![HashMap::new()],
+        }
+    }
+
+    // enter a new local scope
+    pub fn enter(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    // exit the outer-most scope
+    // panics if attempting to exit the global scope
+    pub fn exit(&mut self) {
+        if self.scopes.len() > 1 {
+            self.scopes.pop();
+        } else {
+            panic!("Attempt to exit the global scope");
         }
     }
 
     pub fn get(&self, name: &str) -> Option<&Value> {
-        self.values.get(name)
+        for scope in self.scopes.iter().rev() {
+            if let Some(val) = scope.get(name) {
+                return Some(val);
+            }
+        }
+        None
     }
 
-    pub fn set(&mut self, name: &str, val: Value) {
-        self.values.insert(name.to_string(), val);
+    // returns true if successful, and false if variable is not defined
+    pub fn assign(&mut self, name: &str, val: Value) -> bool {
+        for scope in self.scopes.iter_mut().rev() {
+            if scope.contains_key(name) {
+                scope.insert(name.to_string(), val);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn define(&mut self, name: &str, val: Value) {
+        for scope in self.scopes.iter_mut().rev() {
+            scope.insert(name.to_string(), val);
+            return;
+        }
     }
 
     pub fn is_defined(&self, name: &str) -> bool {
-        self.values.contains_key(name)
+        for scope in self.scopes.iter().rev() {
+            if scope.contains_key(name) {
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -255,15 +294,17 @@ fn execute<'a>(stmt: &'a Stmt, env: &mut Environment) -> Result<(), Error<'a>> {
         Stmt::Var(name, initializer) => {
             if let Some(expr) = initializer {
                 let val = evaluate(expr, env)?;
-                env.set(name, val);
+                env.define(name, val);
             } else {
-                env.set(name, Value::Nil);
+                env.define(name, Value::Nil);
             }
         }
         Stmt::Block(stmts) => {
+            env.enter();
             for stmt in stmts {
                 execute(stmt, env)?;
             }
+            env.exit();
         }
     }
     Ok(())

@@ -68,7 +68,7 @@ impl<'a> Parser<'a> {
                 let stmt = self.parse_declaration()?;
                 stmts.push(stmt);
             }
-            return Err(self.parser_error("Expect '}'."))
+            return Err(self.parser_error("Expect '}' after block."))
         }
 
         // print <expr> ;
