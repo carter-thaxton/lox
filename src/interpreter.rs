@@ -73,9 +73,10 @@ impl Value {
     }
 }
 
-pub fn evaluate<'a>(expr: &'a Expr, env: &Environment) -> Result<Value, Error<'a>> {
+pub fn evaluate<'a>(expr: &'a Expr, env: &mut Environment) -> Result<Value, Error<'a>> {
     match expr {
         Expr::Literal(literal) => Ok(literal.into()),
+
         Expr::Group(expr) => evaluate(expr, env),
 
         Expr::Variable(name) => {
@@ -163,6 +164,15 @@ pub fn evaluate<'a>(expr: &'a Expr, env: &Environment) -> Result<Value, Error<'a
             Ok((!equal).into())
         }
 
+        Expr::Assign { name, right } => {
+            let right = evaluate(right, env)?;
+            if !env.is_defined(name) {
+                return Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
+            }
+            env.set(name, right.clone());
+            Ok(right)
+        }
+
         _ => Err(Error::runtime_error("Unexpected expression.")),
     }
 }
@@ -178,7 +188,7 @@ fn compare_values(left: &Value, right: &Value) -> bool {
     }
 }
 
-fn evaluate_to_number<'a>(expr: &'a Expr, env: &Environment) -> Result<f64, Error<'a>> {
+fn evaluate_to_number<'a>(expr: &'a Expr, env: &mut Environment) -> Result<f64, Error<'a>> {
     let val = evaluate(expr, env)?;
     match val {
         Value::Number(n) => {
@@ -188,7 +198,7 @@ fn evaluate_to_number<'a>(expr: &'a Expr, env: &Environment) -> Result<f64, Erro
     }
 }
 
-fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr, env: &Environment) -> Result<(f64, f64), Error<'a>> {
+fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr, env: &mut Environment) -> Result<(f64, f64), Error<'a>> {
     let left = evaluate(left, env)?;
     let right = evaluate(right, env)?;
     match (left, right) {
@@ -215,8 +225,12 @@ impl Environment {
         self.values.get(name)
     }
 
-    pub fn define(&mut self, name: &str, val: Value) {
+    pub fn set(&mut self, name: &str, val: Value) {
         self.values.insert(name.to_string(), val);
+    }
+
+    pub fn is_defined(&self, name: &str) -> bool {
+        self.values.contains_key(name)
     }
 }
 
@@ -241,9 +255,9 @@ fn execute<'a>(stmt: &'a Stmt, env: &mut Environment) -> Result<(), Error<'a>> {
         Stmt::Var(name, initializer) => {
             if let Some(expr) = initializer {
                 let val = evaluate(expr, env)?;
-                env.define(name, val);
+                env.set(name, val);
             } else {
-                env.define(name, Value::Nil);
+                env.set(name, Value::Nil);
             }
         }
     }

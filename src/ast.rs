@@ -19,8 +19,12 @@ pub enum Expr {
         left: Box<Expr>,
         right: Box<Expr>,
     },
-    Group(Box<Expr>), // needed only to print out expected format
+    Group(Box<Expr>), // parentheses - needed only to print out expected format
     Variable(String),
+    Assign {
+        name: String,
+        right: Box<Expr>,
+    },
 }
 
 pub enum Literal {
@@ -54,6 +58,7 @@ impl Display for Expr {
             Expr::UnaryExpr { op, right } => write!(f, "({} {})", op, right),
             Expr::BinaryExpr { op, left, right } => write!(f, "({} {} {})", op, left, right),
             Expr::Variable(name) => write!(f, "(var {})", name),
+            Expr::Assign { name, right } => write!(f, "({} = {})", name, right),
         }
     }
 }

@@ -77,7 +77,24 @@ impl<'a> Parser<'a> {
     //
 
     pub fn parse_expr(&mut self) -> Result<Expr, Error<'a>> {
-        self.parse_equality()
+        self.parse_assignment()
+    }
+
+    fn parse_assignment(&mut self) -> Result<Expr, Error<'a>> {
+        let left = self.parse_equality()?;
+
+        // <left> = <right> ;
+        if self.matches(TokenKind::Equal).is_some() {
+            // <left> must be an L-value
+            if let Expr::Variable(name) = left {
+                let right = self.parse_assignment()?;
+                return Ok(Expr::Assign { name, right: Box::new(right) });
+            } else {
+                return Err(self.parser_error("Invalid assignment target."))
+            }
+        }
+
+        Ok(left)
     }
 
     fn parse_equality(&mut self) -> Result<Expr, Error<'a>> {
@@ -303,7 +320,7 @@ impl<'a> Parser<'a> {
 
     // create a parser error referring to the span of the next token, with the given message to match the book
     // at EOF, constructs a dummy span using the last seen line number
-    fn parser_error(&mut self, message: &str) -> Error<'a> {
+    fn parser_error(&mut self, message: impl Into<String>) -> Error<'a> {
         if let Some(span) = self.peek_span() {
             Error::parser_error(*span, message)
         } else {

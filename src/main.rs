@@ -68,8 +68,8 @@ fn main() {
             while !parser.at_eof() {
                 match parser.parse_expr() {
                     Ok(expr) => {
-                        let env = Environment::new();
-                        let result = evaluate(&expr, &env);
+                        let mut env = Environment::new();
+                        let result = evaluate(&expr, &mut env);
 
                         match result {
                             Ok(value) => {
