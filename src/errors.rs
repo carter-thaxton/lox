@@ -78,26 +78,19 @@ impl<'a> Error<'a> {
         }
     }
 
-    pub fn parser_error(span: Span<'a>, message: &str) -> Self {
+    pub fn parser_error(span: Span<'a>, message: impl Into<String>) -> Self {
         Error {
-            kind: ErrorKind::ParserError(message.to_owned()),
+            kind: ErrorKind::ParserError(message.into()),
             span: Some(span),
         }
     }
 
-    pub fn runtime_error(message: &str) -> Self {
+    pub fn runtime_error(message: impl Into<String>) -> Self {
         Error {
-            kind: ErrorKind::RuntimeError(message.to_owned()),
+            kind: ErrorKind::RuntimeError(message.into()),
             span: None,
         }
     }
-
-    // pub fn is_runtime_error(&self) -> bool {
-    //     match self.kind {
-    //         ErrorKind::RuntimeError(_) => true,
-    //         _ => false,
-    //     }
-    // }
 
     fn at_message(&self) -> Cow<str> {
         let span = match &self.kind {

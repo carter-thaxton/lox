@@ -7,7 +7,7 @@ pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 
-use interpreter::{evaluate, run};
+use interpreter::{Environment, evaluate, run};
 use lexer::Lexer;
 use parser::Parser;
 
@@ -68,7 +68,8 @@ fn main() {
             while !parser.at_eof() {
                 match parser.parse_expr() {
                     Ok(expr) => {
-                        let result = evaluate(&expr);
+                        let env = Environment::new();
+                        let result = evaluate(&expr, &env);
 
                         match result {
                             Ok(value) => {

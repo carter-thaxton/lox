@@ -1,7 +1,9 @@
 use crate::ast::*;
 use crate::errors::*;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
     True,
@@ -71,38 +73,42 @@ impl Value {
     }
 }
 
-pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
+pub fn evaluate<'a>(expr: &'a Expr, env: &Environment) -> Result<Value, Error<'a>> {
     match expr {
         Expr::Literal(literal) => Ok(literal.into()),
-        Expr::Group(expr) => evaluate(expr),
+        Expr::Group(expr) => evaluate(expr, env),
 
-        Expr::Variable(_name) => {
-            todo!("Lookup variable value from environment");
+        Expr::Variable(name) => {
+            if let Some(val) = env.get(name) {
+                Ok(val.clone())
+            } else {
+                Err(Error::runtime_error(format!("Variable not found: {}", name)))
+            }
         }
 
         Expr::UnaryExpr { op: Op::Not, right } => {
-            let right = evaluate(right)?.is_truthy();
+            let right = evaluate(right, env)?.is_truthy();
             Ok((!right).into())
         }
 
         Expr::UnaryExpr { op: Op::Neg, right } => {
-            let right = evaluate_to_number(right)?;
+            let right = evaluate_to_number(right, env)?;
             Ok(Value::Number(-right))
         }
 
         Expr::BinaryExpr { op: Op::Mul, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right)?;
+            let (left, right) = evaluate_to_numbers(left, right, env)?;
             Ok(Value::Number(left * right))
         }
 
         Expr::BinaryExpr { op: Op::Div, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right)?;
+            let (left, right) = evaluate_to_numbers(left, right, env)?;
             Ok(Value::Number(left / right))
         }
 
         Expr::BinaryExpr { op: Op::Add, left, right } => {
-            let left = evaluate(left)?;
-            let right = evaluate(right)?;
+            let left = evaluate(left, env)?;
+            let right = evaluate(right, env)?;
             match (left, right) {
                 (Value::Number(left), Value::Number(right)) => {
                     Ok(Value::Number(left + right))
@@ -117,41 +123,41 @@ pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
         }
 
         Expr::BinaryExpr { op: Op::Sub, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right)?;
+            let (left, right) = evaluate_to_numbers(left, right, env)?;
             Ok(Value::Number(left - right))
         }
 
         Expr::BinaryExpr { op: Op::Lt, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right)?;
+            let (left, right) = evaluate_to_numbers(left, right, env)?;
             Ok((left < right).into())
         }
 
         Expr::BinaryExpr { op: Op::Le, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right)?;
+            let (left, right) = evaluate_to_numbers(left, right, env)?;
             Ok((left <= right).into())
         }
 
         Expr::BinaryExpr { op: Op::Gt, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right)?;
+            let (left, right) = evaluate_to_numbers(left, right, env)?;
             Ok((left > right).into())
         }
 
         Expr::BinaryExpr { op: Op::Ge, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right)?;
+            let (left, right) = evaluate_to_numbers(left, right, env)?;
             Ok((left >= right).into())
         }
 
         Expr::BinaryExpr { op: Op::Eq, left, right } => {
-            let left = evaluate(left)?;
-            let right = evaluate(right)?;
+            let left = evaluate(left, env)?;
+            let right = evaluate(right, env)?;
 
             let equal = compare_values(&left, &right);
             Ok(equal.into())
         }
 
         Expr::BinaryExpr { op: Op::Ne, left, right } => {
-            let left = evaluate(left)?;
-            let right = evaluate(right)?;
+            let left = evaluate(left, env)?;
+            let right = evaluate(right, env)?;
 
             let equal = compare_values(&left, &right);
             Ok((!equal).into())
@@ -172,8 +178,8 @@ fn compare_values(left: &Value, right: &Value) -> bool {
     }
 }
 
-fn evaluate_to_number(expr: &Expr) -> Result<f64, Error<'_>> {
-    let val = evaluate(expr)?;
+fn evaluate_to_number<'a>(expr: &'a Expr, env: &Environment) -> Result<f64, Error<'a>> {
+    let val = evaluate(expr, env)?;
     match val {
         Value::Number(n) => {
             Ok(n)
@@ -182,9 +188,9 @@ fn evaluate_to_number(expr: &Expr) -> Result<f64, Error<'_>> {
     }
 }
 
-fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr) -> Result<(f64, f64), Error<'a>> {
-    let left = evaluate(left)?;
-    let right = evaluate(right)?;
+fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr, env: &Environment) -> Result<(f64, f64), Error<'a>> {
+    let left = evaluate(left, env)?;
+    let right = evaluate(right, env)?;
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             Ok((left, right))
@@ -194,24 +200,51 @@ fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr) -> Result<(f64, f64)
 }
 
 
+pub struct Environment {
+    values: HashMap<String, Value>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Environment {
+            values: HashMap::new()
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        self.values.get(name)
+    }
+
+    pub fn define(&mut self, name: &str, val: Value) {
+        self.values.insert(name.to_string(), val);
+    }
+}
+
 pub fn run(program: &Program) -> Result<(), Error<'_>> {
+    let mut env = Environment::new();
+
     for stmt in program {
-        execute(stmt)?;
+        execute(stmt, &mut env)?;
     }
     Ok(())
 }
 
-fn execute(stmt: &Stmt) -> Result<(), Error<'_>> {
+fn execute<'a>(stmt: &'a Stmt, env: &mut Environment) -> Result<(), Error<'a>> {
     match stmt {
         Stmt::Expr(expr) => {
-            evaluate(expr)?;
+            evaluate(expr, env)?;
         }
         Stmt::Print(expr) => {
-            let val = evaluate(expr)?;
+            let val = evaluate(expr, env)?;
             println!("{}", val);
         }
-        Stmt::Var(_name, _initializer) => {
-            todo!("Add variable to environment")
+        Stmt::Var(name, initializer) => {
+            if let Some(expr) = initializer {
+                let val = evaluate(expr, env)?;
+                env.define(name, val);
+            } else {
+                env.define(name, Value::Nil);
+            }
         }
     }
     Ok(())
