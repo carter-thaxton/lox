@@ -76,6 +76,10 @@ pub fn evaluate(expr: &Expr) -> Result<Value, Error<'_>> {
         Expr::Literal(literal) => Ok(literal.into()),
         Expr::Group(expr) => evaluate(expr),
 
+        Expr::Variable(_name) => {
+            todo!("Lookup variable value from environment");
+        }
+
         Expr::UnaryExpr { op: Op::Not, right } => {
             let right = evaluate(right)?.is_truthy();
             Ok((!right).into())
@@ -205,6 +209,9 @@ fn execute(stmt: &Stmt) -> Result<(), Error<'_>> {
         Stmt::Print(expr) => {
             let val = evaluate(expr)?;
             println!("{}", val);
+        }
+        Stmt::Var(_name, _initializer) => {
+            todo!("Add variable to environment")
         }
     }
     Ok(())

@@ -23,7 +23,7 @@ impl<'a> Parser<'a> {
         let mut program = Vec::new();
 
         while !self.at_eof() {
-            let stmt = self.parse_stmt()?;
+            let stmt = self.parse_declaration()?;
             program.push(stmt);
         }
 
@@ -35,15 +35,36 @@ impl<'a> Parser<'a> {
     // statements
     //
 
+    fn parse_declaration(&mut self) -> Result<Stmt, Error<'a>> {
+
+        // var <name> (= <expr>)? ;
+        if self.matches(TokenKind::Var).is_some() {
+            let name = self.consume_identifier("Expect variable name.")?.to_string();
+
+            if self.matches(TokenKind::Equal).is_some() {
+                let expr = self.parse_expr()?;
+                self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
+                return Ok(Stmt::Var(name, Some(expr)));
+            } else {
+                return Ok(Stmt::Var(name, None));
+            }
+        }
+
+        self.parse_stmt()
+    }
+
     fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
+
+        // print <expr> ;
         if self.matches(TokenKind::Print).is_some() {
             let expr = self.parse_expr()?;
-            self.expect(TokenKind::Semicolon, "Expect ';' after value.")?;
+            self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
             return Ok(Stmt::Print(Box::new(expr)));
         }
 
+        // <expr> ;
         let expr = self.parse_expr()?;
-        self.expect(TokenKind::Semicolon, "Expect ';' after expresssion.")?;
+        self.consume(TokenKind::Semicolon, "Expect ';' after expresssion.")?;
         Ok(Stmt::Expr(Box::new(expr)))
     }
 
@@ -59,6 +80,7 @@ impl<'a> Parser<'a> {
     fn parse_equality(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_comparison()?;
 
+        // <left> == <right> | <left> != <right>
         while let Some(tok) = self.matches_n(&[TokenKind::EqualEqual, TokenKind::BangEqual]) {
             let op = match tok.kind {
                 TokenKind::EqualEqual => Op::Eq,
@@ -79,6 +101,7 @@ impl<'a> Parser<'a> {
     fn parse_comparison(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_term()?;
 
+        // <left> < <right> | <left> <= <right> | <left> > <right> | <left> >= <right>
         while let Some(tok) = self.matches_n(&[
             TokenKind::Less,
             TokenKind::LessEqual,
@@ -106,6 +129,7 @@ impl<'a> Parser<'a> {
     fn parse_term(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_factor()?;
 
+        // <left> + <right> | <left> - <right>
         while let Some(tok) = self.matches_n(&[TokenKind::Plus, TokenKind::Minus]) {
             let op = match tok.kind {
                 TokenKind::Plus => Op::Add,
@@ -126,6 +150,7 @@ impl<'a> Parser<'a> {
     fn parse_factor(&mut self) -> Result<Expr, Error<'a>> {
         let mut left = self.parse_unary()?;
 
+        // <left> * <right> | <left> / <right>
         while let Some(tok) = self.matches_n(&[TokenKind::Star, TokenKind::Slash]) {
             let op = match tok.kind {
                 TokenKind::Star => Op::Mul,
@@ -144,6 +169,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_unary(&mut self) -> Result<Expr, Error<'a>> {
+        // - <right>
         if self.matches(TokenKind::Minus).is_some() {
             let right = self.parse_unary()?;
             return Ok(Expr::UnaryExpr {
@@ -151,6 +177,8 @@ impl<'a> Parser<'a> {
                 right: Box::new(right),
             });
         }
+
+        // ! <right>
         if self.matches(TokenKind::Bang).is_some() {
             let right = self.parse_unary()?;
             return Ok(Expr::UnaryExpr {
@@ -163,34 +191,46 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary(&mut self) -> Result<Expr, Error<'a>> {
+        // nil
         if self.matches(TokenKind::Nil).is_some() {
             return Ok(Expr::Literal(Literal::Nil));
         }
+
+        // false
         if self.matches(TokenKind::False).is_some() {
             return Ok(Expr::Literal(Literal::False));
         }
+
+        // true
         if self.matches(TokenKind::True).is_some() {
             return Ok(Expr::Literal(Literal::True));
         }
 
-        if let Some(Ok(tok)) = self.peek() {
-            match tok.clone() {
-                // TODO: can we avoid this?
-                TokenKind::String(val) => {
-                    self.advance();
-                    return Ok(Expr::Literal(Literal::String(val.to_string())));
-                }
-                TokenKind::Number(val) => {
-                    self.advance();
-                    return Ok(Expr::Literal(Literal::Number(val)));
-                }
-                _ => {}
+        // "<str>"
+        if let Some(tok) = self.matches_p(|t| matches!(t, TokenKind::String(_))) {
+            match tok.kind {
+                TokenKind::String(val) => return Ok(Expr::Literal(Literal::String(val.to_string()))),
+                _ => unreachable!()
             }
         }
 
+        // <num>
+        if let Some(tok) = self.matches_p(|t| matches!(t, TokenKind::Number(_))) {
+            match tok.kind {
+                TokenKind::Number(val) => return Ok(Expr::Literal(Literal::Number(val))),
+                _ => unreachable!()
+            }
+        }
+
+        // <identifier>
+        if let Some(name) = self.matches_identifier() {
+            return Ok(Expr::Variable(name.to_string()));
+        }
+
+        // ( <expr> )
         if self.matches(TokenKind::LeftParen).is_some() {
             let expr = self.parse_expr()?;
-            self.expect(TokenKind::RightParen, "Expect closing ')'.")?;
+            self.consume(TokenKind::RightParen, "Expect closing ')'.")?;
             return Ok(Expr::Group(Box::new(expr)));
         }
 
@@ -201,13 +241,8 @@ impl<'a> Parser<'a> {
     // helpers
     //
 
-    fn advance(&mut self) -> Token<'a> {
-        self.lexer
-            .next()
-            .expect("Should not be at EOF")
-            .expect("Should not produce a lexer error")
-    }
-
+    // peek ahead without advancing
+    // returns None at EOF, an Err if a lexing error occurs, and the next TokenKind otherwise
     fn peek(&mut self) -> Option<Result<&TokenKind<'a>, &Error<'a>>> {
         match self.lexer.peek() {
             Some(Ok(token)) => Some(Ok(&token.kind)),
@@ -216,6 +251,8 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // peek ahead without advancing to the next available token span, useful for reporting parser errors
+    // returns None at EOF, and the next Span otherwise
     fn peek_span(&mut self) -> Option<&Span<'a>> {
         match self.lexer.peek() {
             Some(Ok(token)) => Some(&token.span),
@@ -226,30 +263,59 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // move to the next token, returning the token
+    // panics if at EOF or if a lexing error occurs - should use the various peek and check methods first, to be sure it will succeed
+    fn advance(&mut self) -> Token<'a> {
+        self.lexer
+            .next()
+            .expect("Should not be at EOF")
+            .expect("Should not produce a lexer error")
+    }
+
+    // peeks ahead without advancing, to see if the next token matches the given kind
     fn check(&mut self, token: TokenKind<'_>) -> bool {
-        if let Some(Ok(tok)) = self.peek() {
-            if *tok == token {
+        if let Some(Ok(kind)) = self.peek() {
+            if *kind == token {
                 return true;
             }
         }
         false
     }
 
-    fn check_n(&mut self, tokens: &[TokenKind<'_>]) -> bool {
-        if let Some(Ok(tok)) = self.peek() {
-            if tokens.contains(tok) {
-                return true;
-            }
-        }
-        false
-    }
-
+    // like check, but advances when successful, returning the whole token if it does
     fn matches(&mut self, token: TokenKind<'_>) -> Option<Token<'_>> {
         if self.check(token) {
             Some(self.advance())
         } else {
             None
         }
+    }
+
+    // create a parser error referring to the span of the next token, with the given message to match the book
+    fn parser_error(&mut self, message: &str) -> Error<'a> {
+        let span = self.peek_span().expect("Should not be at EOF").clone();
+        Error::parser_error(span, message)
+    }
+
+    // like matches, but produces a parser error if it doesn't match
+    fn consume(&mut self, token: TokenKind<'_>, message: &str) -> Result<Token<'a>, Error<'a>> {
+        if self.check(token) {
+            Ok(self.advance())
+        } else {
+            Err(self.parser_error(message))
+        }
+    }
+
+
+    // versions of the above, for multiple TokenKinds, or for arbitrary predicates
+
+    fn check_n(&mut self, tokens: &[TokenKind<'_>]) -> bool {
+        if let Some(Ok(kind)) = self.peek() {
+            if tokens.contains(kind) {
+                return true;
+            }
+        }
+        false
     }
 
     fn matches_n(&mut self, tokens: &[TokenKind<'_>]) -> Option<Token<'_>> {
@@ -260,37 +326,60 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // fn check_p<P>(&mut self, pred: P) -> bool
-    // where
-    //     P: FnOnce(Token<'_>) -> bool
-    // {
-    //     if let Some(Ok(tok)) = self.peek() {
-    //         if pred(*tok) {
-    //             return true
-    //         }
-    //     }
-    //     false
-    // }
-
-    // fn matches_p<P>(&mut self, pred: P) -> Option<Token<'_>>
-    // where
-    //     P: FnOnce(Token<'_>) -> bool
-    // {
-    //     if self.check_p(pred) {
-    //         Some(self.advance())
-    //     } else {
-    //         None
-    //     }
-    // }
-
-    fn parser_error(&mut self, message: &str) -> Error<'a> {
-        let span = self.peek_span().expect("Should not be at EOF").clone();
-        Error::parser_error(span, message)
+    fn check_p<P>(&mut self, pred: P) -> bool
+    where
+        P: FnOnce(&TokenKind<'_>) -> bool
+    {
+        if let Some(Ok(kind)) = self.peek() {
+            if pred(kind) {
+                return true
+            }
+        }
+        false
     }
 
-    fn expect(&mut self, token: TokenKind<'_>, message: &str) -> Result<Token<'a>, Error<'a>> {
-        if self.check(token) {
-            Ok(self.advance())
+    fn matches_p<P>(&mut self, pred: P) -> Option<Token<'_>>
+    where
+        P: FnOnce(&TokenKind<'_>) -> bool
+    {
+        if self.check_p(pred) {
+            Some(self.advance())
+        } else {
+            None
+        }
+    }
+
+    // fn consume_p<P>(&mut self, pred: P, message: &str) -> Result<Token<'a>, Error<'a>>
+    // where
+    //     P: FnOnce(&TokenKind<'_>) -> bool
+    // {
+    //     if self.check_p(pred) {
+    //         Ok(self.advance())
+    //     } else {
+    //         Err(self.parser_error(message))
+    //     }
+    // }
+
+    // similar to above, but handles extracting the string from an identifier
+
+    fn check_identifier(&mut self) -> bool {
+        self.check_p(|kind| matches!(kind, TokenKind::Identifier(_)))
+    }
+
+    fn matches_identifier(&mut self) -> Option<&'a str> {
+        if self.check_identifier() {
+            match self.advance().kind {
+                TokenKind::Identifier(name) => Some(name),
+                _ => unreachable!("Known to be identifier"),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn consume_identifier(&mut self, message: &str) -> Result<&'a str, Error<'a>> {
+        if let Some(name) = self.matches_identifier() {
+            Ok(name)
         } else {
             Err(self.parser_error(message))
         }

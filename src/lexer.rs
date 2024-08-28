@@ -134,11 +134,9 @@ impl TokenKind<'_> {
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
-    _input: &'a str,
     rest: &'a str,
     line: usize,
     col: usize,
-    pos: usize,
 
     lexeme_start: &'a str,
     lexeme_line: usize,
@@ -149,11 +147,9 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Lexer {
-            _input: input,
             rest: input,
             line: 1,
             col: 0,
-            pos: 0,
 
             lexeme_start: input,
             lexeme_line: 0,
@@ -168,7 +164,6 @@ impl<'a> Lexer<'a> {
         let len = c.len_utf8();
         self.rest = chars.as_str();
         self.col += len;
-        self.pos += len;
         self.lexeme_len += len;
         if c == '\n' {
             self.line += 1;
@@ -187,8 +182,9 @@ impl<'a> Lexer<'a> {
         chars.next()
     }
 
+    // starts keeping track of a lexeme
+    // returns span for next char, appropriate for errors during lexing
     fn start_lexeme(&mut self) -> Span<'a> {
-        // returns span for next char, appropriate for errors during lexing
         let next_char_len = match self.peek() {
             Some(c) => c.len_utf8(),
             None => 0,
@@ -206,8 +202,12 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    // returns span for string since calling start_lexeme
     fn end_lexeme(&mut self) -> Span<'a> {
-        // returns span for string since calling start_lexeme
+        if self.lexeme_line == 0 {
+            panic!("end_lexeme called without start_lexeme");
+        }
+
         let result = Span {
             line: self.lexeme_line,
             col: self.lexeme_col,

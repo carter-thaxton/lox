@@ -5,6 +5,7 @@ pub type Program = Vec<Stmt>;
 pub enum Stmt {
     Expr(Box<Expr>),
     Print(Box<Expr>),
+    Var(String, Option<Expr>),
 }
 
 pub enum Expr {
@@ -19,6 +20,7 @@ pub enum Expr {
         right: Box<Expr>,
     },
     Group(Box<Expr>), // needed only to print out expected format
+    Variable(String),
 }
 
 pub enum Literal {
@@ -51,6 +53,7 @@ impl Display for Expr {
             Expr::Group(expr) => write!(f, "(group {})", expr),
             Expr::UnaryExpr { op, right } => write!(f, "({} {})", op, right),
             Expr::BinaryExpr { op, left, right } => write!(f, "({} {} {})", op, left, right),
+            Expr::Variable(name) => write!(f, "(var {})", name),
         }
     }
 }
