@@ -48,6 +48,7 @@ impl<'a> Parser<'a> {
                 self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
                 return Ok(Stmt::Var(name, Some(expr)));
             } else {
+                self.consume(TokenKind::Semicolon, "Expect ';' after var.")?;
                 return Ok(Stmt::Var(name, None));
             }
         }
