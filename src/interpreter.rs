@@ -260,6 +260,11 @@ fn execute<'a>(stmt: &'a Stmt, env: &mut Environment) -> Result<(), Error<'a>> {
                 env.set(name, Value::Nil);
             }
         }
+        Stmt::Block(stmts) => {
+            for stmt in stmts {
+                execute(stmt, env)?;
+            }
+        }
     }
     Ok(())
 }

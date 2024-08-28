@@ -58,6 +58,19 @@ impl<'a> Parser<'a> {
 
     fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
 
+        // { (<stmt>)* }
+        if self.matches(TokenKind::LeftBrace).is_some() {
+            let mut stmts = Vec::new();
+            while !self.at_eof() {
+                if self.matches(TokenKind::RightBrace).is_some() {
+                    return Ok(Stmt::Block(stmts));
+                }
+                let stmt = self.parse_declaration()?;
+                stmts.push(stmt);
+            }
+            return Err(self.parser_error("Expect '}'."))
+        }
+
         // print <expr> ;
         if self.matches(TokenKind::Print).is_some() {
             let expr = self.parse_expr()?;
