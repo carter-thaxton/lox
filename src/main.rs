@@ -14,7 +14,7 @@ use parser::Parser;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: {} tokenize <filename>", args[0]);
+        eprintln!("Usage: {} <command> <filename>\n  command may be one of: tokenize, parse, evaluate, run, test\n", args[0]);
         std::process::exit(2);
     }
 
@@ -105,6 +105,9 @@ fn main() {
                     std::process::exit(65);
                 }
             }
+        }
+        "test" => {
+            todo!("Implement this...");
         }
         _ => {
             eprintln!("Unknown command: {}", command);
