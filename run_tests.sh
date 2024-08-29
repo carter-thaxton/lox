@@ -3,10 +3,13 @@
 
 cargo build --release
 
+FAIL=0
 for arg in "$@"; do
-  find $arg -type f -print0 | while IFS= read -r -d $'\0' file; do
+  while read -r file; do
     echo
     echo "$file";
-    target/release/lox test "$file"
-  done
+    target/release/lox test "$file" || FAIL=1;
+  done < <(find $arg -type f)
 done
+
+exit $FAIL
