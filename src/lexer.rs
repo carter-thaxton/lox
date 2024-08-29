@@ -54,7 +54,7 @@ pub enum TokenKind<'a> {
 
     // specially formatted comments, used for testing
     ExpectOutput(&'a str),
-    ExpectParserError(&'a str),
+    ExpectParserError(Cow<'a, str>),
     ExpectRuntimeError(&'a str),
 
     // keywords
@@ -318,8 +318,15 @@ impl<'a> Iterator for Lexer<'a> {
                             {
                                 (TokenKind::ExpectRuntimeError(txt), span)
                             } else if comment.starts_with("// Error") {
+                                // Error at ...
                                 let txt = comment.strip_prefix("// ").unwrap();
-                                (TokenKind::ExpectParserError(txt), span)
+                                // construct the expected error message with the current line number
+                                let txt = format!("[line {}] {}", self.line, txt);
+                                (TokenKind::ExpectParserError(txt.into()), span)
+                            } else if comment.starts_with("// [line ") && comment.contains(" Error") {
+                                // [line 2] Error at ...
+                                let txt = comment.strip_prefix("// ").unwrap();
+                                (TokenKind::ExpectParserError(Cow::Borrowed(txt)), span)
                             } else {
                                 // normal comment
                                 continue; // ignore, and restart next lexeme

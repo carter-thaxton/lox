@@ -57,16 +57,16 @@ impl Display for ErrorKind {
                 write!(f, "{}", msg)
             }
             ErrorKind::TestExpectedParserError(msg) => {
-                write!(f, "TEST: Expected parser error: {}", msg)
+                write!(f, "FAIL: Expected parser error: {}", msg)
             }
             ErrorKind::TestExpectedRuntimeError(msg) => {
-                write!(f, "TEST: Expected runtime error: {}", msg)
+                write!(f, "FAIL: Expected runtime error: {}", msg)
             }
             ErrorKind::TestOutputMismatch(expected, actual) => {
-                write!(f, "TEST: Expected output: {} - got: {}", expected, actual)
+                write!(f, "FAIL: Expected output: {} - got: {}", expected, actual)
             }
             ErrorKind::TestOutputMissing(expected) => {
-                write!(f, "TEST: Expected output: {} - got nothing", expected)
+                write!(f, "FAIL: Expected output: {} - got nothing", expected)
             }
         }
     }

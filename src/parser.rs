@@ -20,7 +20,7 @@ impl<'a> Parser<'a> {
         self.lexer.peek().is_none()
     }
 
-    pub fn parse(mut self) -> Result<Program, Error<'a>> {
+    pub fn parse(&mut self) -> Result<Program, Error<'a>> {
         let mut program = Vec::new();
 
         while !self.at_eof() {
@@ -29,6 +29,10 @@ impl<'a> Parser<'a> {
         }
 
         Ok(program)
+    }
+
+    pub fn lexer(&mut self) -> &mut Peekable<Lexer<'a>> {
+        &mut self.lexer
     }
 
     //
@@ -69,12 +73,10 @@ impl<'a> Parser<'a> {
         }) {
             match tok.kind {
                 TokenKind::ExpectOutput(txt) => return Ok(Stmt::ExpectOutput(txt.to_string())),
-                TokenKind::ExpectRuntimeError(msg) => {
-                    return Ok(Stmt::ExpectRuntimeError(msg.to_string()))
-                }
-                TokenKind::ExpectParserError(msg) => {
-                    // reaching here means we did NOT actually get a parser error before this
-                    return Err(Error::test_expected_parser_error(msg));
+                TokenKind::ExpectRuntimeError(msg) => return Ok(Stmt::ExpectRuntimeError(msg.to_string())),
+                TokenKind::ExpectParserError(_msg) => {
+                    // ignore this while parsing...
+                    continue;
                 }
                 _ => unreachable!(),
             }
@@ -293,6 +295,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Group(Box::new(expr)));
         }
 
+        self.advance_err()?;
         Err(self.parser_error("Expect expression."))
     }
 
@@ -335,6 +338,18 @@ impl<'a> Parser<'a> {
         self.last_line = token.span.line;
 
         token
+    }
+
+    // like advance, but handles lexer errors, and returns an optional token
+    fn advance_err(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
+        match self.lexer.next() {
+            Some(Err(err)) => Err(err),
+            None => Ok(None),
+            Some(Ok(token)) => {
+                self.last_line = token.span.line;
+                Ok(Some(token))
+            }
+        }
     }
 
     // peeks ahead without advancing, to see if the next token matches the given kind

@@ -319,8 +319,9 @@ impl Interpreter {
     fn print(&mut self, val: &Value) {
         if self.test {
             // keep track of each output line
-            let line = format!("{}", val);
-            self.test_output.push_back(line);
+            for line in format!("{}", val).lines() {
+                self.test_output.push_back(line.to_string());
+            }
         } else {
             // simply print to stdout
             println!("{}", val);
@@ -330,6 +331,7 @@ impl Interpreter {
     fn check_output<'a>(&mut self, expected: &'a str) -> Result<(), Error<'a>> {
         if let Some(actual) = self.test_output.pop_front() {
             if actual == expected {
+                println!("PASS: expect: {}", actual);
                 return Ok(());
             } else {
                 return Err(Error::test_output_mismatch(expected, actual));
