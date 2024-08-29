@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::env;
 use std::fs;
 
+use colored::Colorize;
+
 pub mod ast;
 pub mod errors;
 pub mod interpreter;
@@ -125,21 +127,21 @@ fn main() {
                     if let Err(err) = result {
                         if err.is_test() {
                             // reached an output mismatch or other test error detected at runtime
-                            eprintln!("{}", err);
+                            println!("{}", err);
                             std::process::exit(20);
                         } else {
                             // runtime error - check if it was expected
                             let actual = err.to_string();
 
                             if expected_runtime_errors.is_empty() {
-                                eprintln!("FAIL: Unexpected runtime error: {}", err);
+                                println!("{}: Unexpected runtime error: {}", "FAIL".red(), err);
                                 std::process::exit(20);
                             } else {
                                 if expected_runtime_errors.iter().any(|e| *e == actual) {
-                                    println!("PASS: expect runtime error: {}", actual);
+                                    println!("{}: expect runtime error: {}", "PASS".green(), actual);
                                 } else {
                                     let expected = &expected_runtime_errors[0];
-                                    eprintln!("FAIL: Expected runtime error: {} - got: {}", expected, actual);
+                                    println!("{}: Expected runtime error: {} - got: {}", "FAIL".red(), expected, actual);
                                     std::process::exit(20);
                                 }
                             }
@@ -151,14 +153,14 @@ fn main() {
                     let actual = err.to_string();
 
                     if expected_parser_errors.is_empty() {
-                        eprintln!("FAIL: Unexpected parser error: {}", err);
+                        println!("{}: Unexpected parser error: {}", "FAIL".red(), err);
                         std::process::exit(20);
                     } else {
                         if expected_parser_errors.iter().any(|e| *e == actual) {
-                            println!("PASS: expected parser error: {}", actual);
+                            println!("{}: expected parser error: {}", "PASS".green(), actual);
                         } else {
                             let expected = &expected_parser_errors[0];
-                            eprintln!("FAIL: Expected parser error: {} - got: {}", expected, actual);
+                            println!("{}: Expected parser error: {} - got: {}", "FAIL".red(), expected, actual);
                             std::process::exit(20);
                         }
                     }

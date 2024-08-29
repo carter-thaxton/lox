@@ -2,6 +2,7 @@ use crate::ast::*;
 use crate::errors::*;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Display, Formatter};
+use colored::Colorize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -331,7 +332,7 @@ impl Interpreter {
     fn check_output<'a>(&mut self, expected: &'a str) -> Result<(), Error<'a>> {
         if let Some(actual) = self.test_output.pop_front() {
             if actual == expected {
-                println!("PASS: expect: {}", actual);
+                println!("{}: expect: {}", "PASS".green(), actual);
                 return Ok(());
             } else {
                 return Err(Error::test_output_mismatch(expected, actual));
