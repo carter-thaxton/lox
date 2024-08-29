@@ -295,7 +295,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Group(Box::new(expr)));
         }
 
-        self.advance_err()?;
+        self.matches_err()?;
         Err(self.parser_error("Expect expression."))
     }
 
@@ -340,18 +340,6 @@ impl<'a> Parser<'a> {
         token
     }
 
-    // like advance, but handles lexer errors, and returns an optional token
-    fn advance_err(&mut self) -> Result<Option<Token<'a>>, Error<'a>> {
-        match self.lexer.next() {
-            Some(Err(err)) => Err(err),
-            None => Ok(None),
-            Some(Ok(token)) => {
-                self.last_line = token.span.line;
-                Ok(Some(token))
-            }
-        }
-    }
-
     // peeks ahead without advancing, to see if the next token matches the given kind
     fn check(&mut self, token: TokenKind<'_>) -> bool {
         if let Some(Ok(kind)) = self.peek() {
@@ -368,6 +356,17 @@ impl<'a> Parser<'a> {
             Some(self.advance())
         } else {
             None
+        }
+    }
+
+    // check to see if next token is a lexer error, and advances if so
+    // does nothing at EOF or when next token is not an error
+    fn matches_err(&mut self) -> Result<(), Error<'a>> {
+        match self.lexer.peek() {
+            Some(Err(_)) => {
+                Err(self.lexer.next().unwrap().unwrap_err())
+            }
+            _ => Ok(()),
         }
     }
 
