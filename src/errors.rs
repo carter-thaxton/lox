@@ -15,6 +15,11 @@ pub enum ErrorKind {
     InvalidNumber(String),
     ParserError(String),
     RuntimeError(String),
+
+    TestExpectedParserError(String),
+    TestExpectedRuntimeError(String),
+    TestOutputMismatch(String, String),
+    TestOutputMissing(String),
 }
 
 impl Display for Error<'_> {
@@ -50,6 +55,18 @@ impl Display for ErrorKind {
             }
             ErrorKind::RuntimeError(msg) => {
                 write!(f, "{}", msg)
+            }
+            ErrorKind::TestExpectedParserError(msg) => {
+                write!(f, "TEST: Expected parser error: {}", msg)
+            }
+            ErrorKind::TestExpectedRuntimeError(msg) => {
+                write!(f, "TEST: Expected runtime error: {}", msg)
+            }
+            ErrorKind::TestOutputMismatch(expected, actual) => {
+                write!(f, "TEST: Expected output: {} - got: {}", expected, actual)
+            }
+            ErrorKind::TestOutputMissing(expected) => {
+                write!(f, "TEST: Expected output: {} - got nothing", expected)
             }
         }
     }
@@ -90,6 +107,44 @@ impl<'a> Error<'a> {
             kind: ErrorKind::RuntimeError(message.into()),
             span: None,
         }
+    }
+
+    pub fn test_expected_parser_error(message: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::TestExpectedParserError(message.into()),
+            span: None,
+        }
+    }
+
+    pub fn test_expected_runtime_error(message: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::TestExpectedRuntimeError(message.into()),
+            span: None,
+        }
+    }
+
+    pub fn test_output_mismatch(expected: impl Into<String>, actual: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::TestOutputMismatch(expected.into(), actual.into()),
+            span: None,
+        }
+    }
+
+    pub fn test_output_missing(expected: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::TestOutputMissing(expected.into()),
+            span: None,
+        }
+    }
+
+    pub fn is_test(&self) -> bool {
+        matches!(
+            self.kind,
+            ErrorKind::TestExpectedParserError(_)
+                | ErrorKind::TestExpectedRuntimeError(_)
+                | ErrorKind::TestOutputMismatch(_, _)
+                | ErrorKind::TestOutputMissing(_)
+        )
     }
 
     fn at_message(&self) -> Cow<str> {

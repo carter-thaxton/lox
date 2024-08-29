@@ -7,6 +7,9 @@ pub enum Stmt {
     Print(Box<Expr>),
     Var(String, Option<Expr>),
     Block(Vec<Stmt>),
+
+    ExpectOutput(String),
+    ExpectRuntimeError(String),
 }
 
 pub enum Expr {

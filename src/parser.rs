@@ -9,10 +9,9 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-
-    pub fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str, enable_test_comments: bool) -> Self {
         Parser {
-            lexer: Lexer::new(input).peekable(),
+            lexer: Lexer::new(input, enable_test_comments).peekable(),
             last_line: 1,
         }
     }
@@ -32,16 +31,16 @@ impl<'a> Parser<'a> {
         Ok(program)
     }
 
-
     //
     // statements
     //
 
     fn parse_declaration(&mut self) -> Result<Stmt, Error<'a>> {
-
         // var <name> (= <expr>)? ;
         if self.matches(TokenKind::Var).is_some() {
-            let name = self.consume_identifier("Expect variable name.")?.to_string();
+            let name = self
+                .consume_identifier("Expect variable name.")?
+                .to_string();
 
             if self.matches(TokenKind::Equal).is_some() {
                 let expr = self.parse_expr()?;
@@ -57,6 +56,29 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
+        // expect: <output value>
+        // expect runtime error: <error message>
+        // Error <parser error>
+        while let Some(tok) = self.matches_p(|t| {
+            matches!(
+                t,
+                TokenKind::ExpectOutput(_)
+                    | TokenKind::ExpectParserError(_)
+                    | TokenKind::ExpectRuntimeError(_)
+            )
+        }) {
+            match tok.kind {
+                TokenKind::ExpectOutput(txt) => return Ok(Stmt::ExpectOutput(txt.to_string())),
+                TokenKind::ExpectRuntimeError(msg) => {
+                    return Ok(Stmt::ExpectRuntimeError(msg.to_string()))
+                }
+                TokenKind::ExpectParserError(msg) => {
+                    // reaching here means we did NOT actually get a parser error before this
+                    return Err(Error::test_expected_parser_error(msg));
+                }
+                _ => unreachable!(),
+            }
+        }
 
         // { (<stmt>)* }
         if self.matches(TokenKind::LeftBrace).is_some() {
@@ -68,7 +90,7 @@ impl<'a> Parser<'a> {
                 let stmt = self.parse_declaration()?;
                 stmts.push(stmt);
             }
-            return Err(self.parser_error("Expect '}' after block."))
+            return Err(self.parser_error("Expect '}' after block."));
         }
 
         // print <expr> ;
@@ -83,7 +105,6 @@ impl<'a> Parser<'a> {
         self.consume(TokenKind::Semicolon, "Expect ';' after expresssion.")?;
         Ok(Stmt::Expr(Box::new(expr)))
     }
-
 
     //
     // expressions
@@ -101,9 +122,12 @@ impl<'a> Parser<'a> {
             // <left> must be an L-value
             if let Expr::Variable(name) = left {
                 let right = self.parse_assignment()?;
-                return Ok(Expr::Assign { name, right: Box::new(right) });
+                return Ok(Expr::Assign {
+                    name,
+                    right: Box::new(right),
+                });
             } else {
-                return Err(self.parser_error("Invalid assignment target."))
+                return Err(self.parser_error("Invalid assignment target."));
             }
         }
 
@@ -242,8 +266,10 @@ impl<'a> Parser<'a> {
         // "<str>"
         if let Some(tok) = self.matches_p(|t| matches!(t, TokenKind::String(_))) {
             match tok.kind {
-                TokenKind::String(val) => return Ok(Expr::Literal(Literal::String(val.to_string()))),
-                _ => unreachable!()
+                TokenKind::String(val) => {
+                    return Ok(Expr::Literal(Literal::String(val.to_string())))
+                }
+                _ => unreachable!(),
             }
         }
 
@@ -251,7 +277,7 @@ impl<'a> Parser<'a> {
         if let Some(tok) = self.matches_p(|t| matches!(t, TokenKind::Number(_))) {
             match tok.kind {
                 TokenKind::Number(val) => return Ok(Expr::Literal(Literal::Number(val))),
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
 
@@ -292,9 +318,7 @@ impl<'a> Parser<'a> {
             Some(Err(Error {
                 span: Some(span), ..
             })) => Some(span),
-            _ => {
-                None
-            }
+            _ => None,
         }
     }
 
@@ -302,7 +326,8 @@ impl<'a> Parser<'a> {
     // panics if at EOF or if a lexing error occurs - should use the various peek and check methods first, to be sure it will succeed
     // keeps track of last-seen line number, for errors at EOF
     fn advance(&mut self) -> Token<'a> {
-        let token = self.lexer
+        let token = self
+            .lexer
             .next()
             .expect("Should not be at EOF")
             .expect("Should not produce a lexer error");
@@ -350,7 +375,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-
     // versions of the above, for multiple TokenKinds, or for arbitrary predicates
 
     fn check_n(&mut self, tokens: &[TokenKind<'_>]) -> bool {
@@ -372,11 +396,11 @@ impl<'a> Parser<'a> {
 
     fn check_p<P>(&mut self, pred: P) -> bool
     where
-        P: FnOnce(&TokenKind<'_>) -> bool
+        P: FnOnce(&TokenKind<'_>) -> bool,
     {
         if let Some(Ok(kind)) = self.peek() {
             if pred(kind) {
-                return true
+                return true;
             }
         }
         false
@@ -384,7 +408,7 @@ impl<'a> Parser<'a> {
 
     fn matches_p<P>(&mut self, pred: P) -> Option<Token<'_>>
     where
-        P: FnOnce(&TokenKind<'_>) -> bool
+        P: FnOnce(&TokenKind<'_>) -> bool,
     {
         if self.check_p(pred) {
             Some(self.advance())

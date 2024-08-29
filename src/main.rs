@@ -7,7 +7,7 @@ pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 
-use interpreter::{Environment, evaluate, run};
+use interpreter::Interpreter;
 use lexer::Lexer;
 use parser::Parser;
 
@@ -29,7 +29,7 @@ fn main() {
     match command.as_str() {
         "tokenize" => {
             let mut lexer_error = false;
-            let lexer = Lexer::new(&file_contents);
+            let lexer = Lexer::new(&file_contents, false);
             for result in lexer {
                 match result {
                     Ok(token) => {
@@ -48,7 +48,7 @@ fn main() {
             }
         }
         "parse" => {
-            let mut parser = Parser::new(&file_contents);
+            let mut parser = Parser::new(&file_contents, false);
 
             while !parser.at_eof() {
                 match parser.parse_expr() {
@@ -63,13 +63,13 @@ fn main() {
             }
         }
         "evaluate" => {
-            let mut parser = Parser::new(&file_contents);
+            let mut parser = Parser::new(&file_contents, false);
 
             while !parser.at_eof() {
                 match parser.parse_expr() {
                     Ok(expr) => {
-                        let mut env = Environment::new();
-                        let result = evaluate(&expr, &mut env);
+                        let mut int = Interpreter::new(false);
+                        let result = int.evaluate(&expr);
 
                         match result {
                             Ok(value) => {
@@ -89,12 +89,13 @@ fn main() {
             }
         }
         "run" => {
-            let parser = Parser::new(&file_contents);
+            let parser = Parser::new(&file_contents, false);
             let result = parser.parse();
 
             match result {
                 Ok(program) => {
-                    let result = run(&program);
+                    let mut int = Interpreter::new(false);
+                    let result = int.run(&program);
                     if let Err(err) = result {
                         eprintln!("{}", err);
                         std::process::exit(70);
@@ -107,7 +108,30 @@ fn main() {
             }
         }
         "test" => {
-            todo!("Implement this...");
+            let parser = Parser::new(&file_contents, true);
+            let result = parser.parse();
+
+            match result {
+                Ok(program) => {
+                    let mut int = Interpreter::new(true);
+                    let result = int.run(&program);
+                    if let Err(err) = result {
+                        if err.is_test() {
+                            eprintln!("{}", err);
+                            std::process::exit(20);
+                        } else {
+                            todo!("Look for runtime error in upcoming statements");
+                            // eprintln!("{}", err);
+                            // std::process::exit(70);
+                        }
+                    }
+                }
+                Err(_err) => {
+                    todo!("Look for parser error in upcoming tokens");
+                    // eprintln!("{}", err);
+                    // std::process::exit(65);
+                }
+            }
         }
         _ => {
             eprintln!("Unknown command: {}", command);

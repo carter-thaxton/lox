@@ -20,7 +20,7 @@ impl Span<'_> {
         Span {
             line: line,
             col: 0,
-            lexeme: ""
+            lexeme: "",
         }
     }
 }
@@ -47,9 +47,15 @@ pub enum TokenKind<'a> {
     GreaterEqual,
     Slash,
 
+    // tokens with data
     String(Cow<'a, str>),
     Number(f64),
     Identifier(&'a str),
+
+    // specially formatted comments, used for testing
+    ExpectOutput(&'a str),
+    ExpectParserError(&'a str),
+    ExpectRuntimeError(&'a str),
 
     // keywords
     And,
@@ -124,6 +130,10 @@ impl TokenKind<'_> {
             TokenKind::True             => "TRUE",
             TokenKind::Var              => "VAR",
             TokenKind::While            => "WHILE",
+
+            TokenKind::ExpectOutput(_)          => "EXPECT",
+            TokenKind::ExpectParserError(_)     => "PARSER_ERROR",
+            TokenKind::ExpectRuntimeError(_)    => "RUNTIME_ERROR",
         }
     }
 
@@ -152,10 +162,12 @@ pub struct Lexer<'a> {
     lexeme_line: usize,
     lexeme_col: usize,
     lexeme_len: usize,
+
+    enable_test_comments: bool,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str, enable_test_comments: bool) -> Self {
         Lexer {
             rest: input,
             line: 1,
@@ -165,6 +177,8 @@ impl<'a> Lexer<'a> {
             lexeme_line: 0,
             lexeme_col: 0,
             lexeme_len: 0,
+
+            enable_test_comments,
         }
     }
 
@@ -212,6 +226,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    // end a lexeme, resetting the lexeme state
     // returns span for string since calling start_lexeme
     fn end_lexeme(&mut self) -> Span<'a> {
         if self.lexeme_line == 0 {
@@ -291,7 +306,27 @@ impl<'a> Iterator for Lexer<'a> {
                                 break;
                             }
                         }
-                        continue; // ignore, and restart next lexeme
+
+                        if self.enable_test_comments {
+                            // recognize specially-formatted comments for testing
+                            let span = self.end_lexeme();
+                            let comment = span.lexeme.trim();
+                            if let Some(txt) = comment.strip_prefix("// expect: ") {
+                                (TokenKind::ExpectOutput(txt), span)
+                            } else if let Some(txt) =
+                                comment.strip_prefix("// expect runtime error: ")
+                            {
+                                (TokenKind::ExpectRuntimeError(txt), span)
+                            } else if comment.starts_with("// Error") {
+                                let txt = comment.strip_prefix("// ").unwrap();
+                                (TokenKind::ExpectParserError(txt), span)
+                            } else {
+                                // normal comment
+                                continue; // ignore, and restart next lexeme
+                            }
+                        } else {
+                            continue; // ignore, and restart next lexeme
+                        }
                     } else {
                         (TokenKind::Slash, self.end_lexeme())
                     }

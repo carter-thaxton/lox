@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::errors::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,110 +73,6 @@ impl Value {
     }
 }
 
-pub fn evaluate<'a>(expr: &'a Expr, env: &mut Environment) -> Result<Value, Error<'a>> {
-    match expr {
-        Expr::Literal(literal) => Ok(literal.into()),
-
-        Expr::Group(expr) => evaluate(expr, env),
-
-        Expr::Variable(name) => {
-            if let Some(val) = env.get(name) {
-                Ok(val.clone())
-            } else {
-                Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
-            }
-        }
-
-        Expr::UnaryExpr { op: Op::Not, right } => {
-            let right = evaluate(right, env)?.is_truthy();
-            Ok((!right).into())
-        }
-
-        Expr::UnaryExpr { op: Op::Neg, right } => {
-            let right = evaluate_to_number(right, env)?;
-            Ok(Value::Number(-right))
-        }
-
-        Expr::BinaryExpr { op: Op::Mul, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right, env)?;
-            Ok(Value::Number(left * right))
-        }
-
-        Expr::BinaryExpr { op: Op::Div, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right, env)?;
-            Ok(Value::Number(left / right))
-        }
-
-        Expr::BinaryExpr { op: Op::Add, left, right } => {
-            let left = evaluate(left, env)?;
-            let right = evaluate(right, env)?;
-            match (left, right) {
-                (Value::Number(left), Value::Number(right)) => {
-                    Ok(Value::Number(left + right))
-                }
-                (Value::String(left), Value::String(right)) => {
-                    let mut result = left;
-                    result.push_str(&right);
-                    Ok(Value::String(result))
-                }
-                _ => Err(Error::runtime_error("Operands must be two numbers or two strings."))
-            }
-        }
-
-        Expr::BinaryExpr { op: Op::Sub, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right, env)?;
-            Ok(Value::Number(left - right))
-        }
-
-        Expr::BinaryExpr { op: Op::Lt, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right, env)?;
-            Ok((left < right).into())
-        }
-
-        Expr::BinaryExpr { op: Op::Le, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right, env)?;
-            Ok((left <= right).into())
-        }
-
-        Expr::BinaryExpr { op: Op::Gt, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right, env)?;
-            Ok((left > right).into())
-        }
-
-        Expr::BinaryExpr { op: Op::Ge, left, right } => {
-            let (left, right) = evaluate_to_numbers(left, right, env)?;
-            Ok((left >= right).into())
-        }
-
-        Expr::BinaryExpr { op: Op::Eq, left, right } => {
-            let left = evaluate(left, env)?;
-            let right = evaluate(right, env)?;
-
-            let equal = compare_values(&left, &right);
-            Ok(equal.into())
-        }
-
-        Expr::BinaryExpr { op: Op::Ne, left, right } => {
-            let left = evaluate(left, env)?;
-            let right = evaluate(right, env)?;
-
-            let equal = compare_values(&left, &right);
-            Ok((!equal).into())
-        }
-
-        Expr::Assign { name, right } => {
-            let right = evaluate(right, env)?;
-            if env.assign(name, right.clone()) {
-                Ok(right)
-            } else {
-                Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
-            }
-        }
-
-        _ => Err(Error::runtime_error("Unexpected expression.")),
-    }
-}
-
 fn compare_values(left: &Value, right: &Value) -> bool {
     match (left, right) {
         (Value::Nil, Value::Nil) => true,
@@ -188,47 +84,282 @@ fn compare_values(left: &Value, right: &Value) -> bool {
     }
 }
 
-fn evaluate_to_number<'a>(expr: &'a Expr, env: &mut Environment) -> Result<f64, Error<'a>> {
-    let val = evaluate(expr, env)?;
-    match val {
-        Value::Number(n) => {
-            Ok(n)
+pub struct Interpreter {
+    env: Environment,
+    test: bool,
+    test_output: VecDeque<String>,
+}
+
+impl Interpreter {
+    pub fn new(test: bool) -> Self {
+        Interpreter {
+            env: Environment::new(),
+            test,
+            test_output: VecDeque::new(),
         }
-        _ => Err(Error::runtime_error("Operand must be a number."))
+    }
+
+    pub fn run<'a>(&mut self, program: &'a Program) -> Result<(), Error<'a>> {
+        for stmt in program {
+            self.execute(stmt)?;
+        }
+        Ok(())
+    }
+
+    pub fn evaluate<'a>(&mut self, expr: &'a Expr) -> Result<Value, Error<'a>> {
+        match expr {
+            Expr::Literal(literal) => Ok(literal.into()),
+
+            Expr::Group(expr) => self.evaluate(expr),
+
+            Expr::Variable(name) => {
+                if let Some(val) = self.env.get(name) {
+                    Ok(val.clone())
+                } else {
+                    Err(Error::runtime_error(format!(
+                        "Undefined variable '{}'.",
+                        name
+                    )))
+                }
+            }
+
+            Expr::UnaryExpr { op: Op::Not, right } => {
+                let right = self.evaluate(right)?.is_truthy();
+                Ok((!right).into())
+            }
+
+            Expr::UnaryExpr { op: Op::Neg, right } => {
+                let right = self.evaluate_to_number(right)?;
+                Ok(Value::Number(-right))
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Mul,
+                left,
+                right,
+            } => {
+                let (left, right) = self.evaluate_to_numbers(left, right)?;
+                Ok(Value::Number(left * right))
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Div,
+                left,
+                right,
+            } => {
+                let (left, right) = self.evaluate_to_numbers(left, right)?;
+                Ok(Value::Number(left / right))
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Add,
+                left,
+                right,
+            } => {
+                let left = self.evaluate(left)?;
+                let right = self.evaluate(right)?;
+                match (left, right) {
+                    (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left + right)),
+                    (Value::String(left), Value::String(right)) => {
+                        let mut result = left;
+                        result.push_str(&right);
+                        Ok(Value::String(result))
+                    }
+                    _ => Err(Error::runtime_error(
+                        "Operands must be two numbers or two strings.",
+                    )),
+                }
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Sub,
+                left,
+                right,
+            } => {
+                let (left, right) = self.evaluate_to_numbers(left, right)?;
+                Ok(Value::Number(left - right))
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Lt,
+                left,
+                right,
+            } => {
+                let (left, right) = self.evaluate_to_numbers(left, right)?;
+                Ok((left < right).into())
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Le,
+                left,
+                right,
+            } => {
+                let (left, right) = self.evaluate_to_numbers(left, right)?;
+                Ok((left <= right).into())
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Gt,
+                left,
+                right,
+            } => {
+                let (left, right) = self.evaluate_to_numbers(left, right)?;
+                Ok((left > right).into())
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Ge,
+                left,
+                right,
+            } => {
+                let (left, right) = self.evaluate_to_numbers(left, right)?;
+                Ok((left >= right).into())
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Eq,
+                left,
+                right,
+            } => {
+                let left = self.evaluate(left)?;
+                let right = self.evaluate(right)?;
+
+                let equal = compare_values(&left, &right);
+                Ok(equal.into())
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Ne,
+                left,
+                right,
+            } => {
+                let left = self.evaluate(left)?;
+                let right = self.evaluate(right)?;
+
+                let equal = compare_values(&left, &right);
+                Ok((!equal).into())
+            }
+
+            Expr::Assign { name, right } => {
+                let right = self.evaluate(right)?;
+                if self.env.assign(name, right.clone()) {
+                    Ok(right)
+                } else {
+                    Err(Error::runtime_error(format!(
+                        "Undefined variable '{}'.",
+                        name
+                    )))
+                }
+            }
+
+            _ => Err(Error::runtime_error("Unexpected expression.")),
+        }
+    }
+
+    fn evaluate_to_number<'a>(&mut self, expr: &'a Expr) -> Result<f64, Error<'a>> {
+        let val = self.evaluate(expr)?;
+        match val {
+            Value::Number(n) => Ok(n),
+            _ => Err(Error::runtime_error("Operand must be a number.")),
+        }
+    }
+
+    fn evaluate_to_numbers<'a>(
+        &mut self,
+        left: &'a Expr,
+        right: &'a Expr,
+    ) -> Result<(f64, f64), Error<'a>> {
+        let left = self.evaluate(left)?;
+        let right = self.evaluate(right)?;
+        match (left, right) {
+            (Value::Number(left), Value::Number(right)) => Ok((left, right)),
+            _ => Err(Error::runtime_error("Operands must be numbers.")),
+        }
+    }
+
+    fn execute<'a>(&mut self, stmt: &'a Stmt) -> Result<(), Error<'a>> {
+        match stmt {
+            Stmt::Expr(expr) => {
+                self.evaluate(expr)?;
+            }
+            Stmt::Print(expr) => {
+                let val = self.evaluate(expr)?;
+                self.print(&val);
+            }
+            Stmt::Var(name, initializer) => {
+                if let Some(expr) = initializer {
+                    let val = self.evaluate(expr)?;
+                    self.env.define(name, val);
+                } else {
+                    self.env.define(name, Value::Nil);
+                }
+            }
+            Stmt::Block(stmts) => {
+                self.env.enter();
+                for stmt in stmts {
+                    self.execute(stmt)?;
+                }
+                self.env.exit();
+            }
+            Stmt::ExpectOutput(txt) => {
+                if self.test {
+                    self.check_output(txt)?;
+                }
+            }
+            Stmt::ExpectRuntimeError(msg) => {
+                if self.test {
+                    // reaching here means we did NOT actually get a runtime error before this
+                    return Err(Error::test_expected_runtime_error(msg));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn print(&mut self, val: &Value) {
+        if self.test {
+            // keep track of each output line
+            let line = format!("{}", val);
+            self.test_output.push_back(line);
+        } else {
+            // simply print to stdout
+            println!("{}", val);
+        }
+    }
+
+    fn check_output<'a>(&mut self, expected: &'a str) -> Result<(), Error<'a>> {
+        if let Some(actual) = self.test_output.pop_front() {
+            if actual == expected {
+                return Ok(());
+            } else {
+                return Err(Error::test_output_mismatch(expected, actual));
+            }
+        } else {
+            return Err(Error::test_output_missing(expected));
+        }
     }
 }
 
-fn evaluate_to_numbers<'a>(left: &'a Expr, right: &'a Expr, env: &mut Environment) -> Result<(f64, f64), Error<'a>> {
-    let left = evaluate(left, env)?;
-    let right = evaluate(right, env)?;
-    match (left, right) {
-        (Value::Number(left), Value::Number(right)) => {
-            Ok((left, right))
-        }
-        _ => Err(Error::runtime_error("Operands must be numbers."))
-    }
-}
-
-pub struct Environment {
+struct Environment {
     scopes: Vec<HashMap<String, Value>>,
 }
 
 impl Environment {
     // creates a new environment in the outer-most scope
-    pub fn new() -> Self {
+    fn new() -> Self {
         Environment {
             scopes: vec![HashMap::new()],
         }
     }
 
     // enter a new local scope
-    pub fn enter(&mut self) {
+    fn enter(&mut self) {
         self.scopes.push(HashMap::new());
     }
 
     // exit the outer-most scope
     // panics if attempting to exit the global scope
-    pub fn exit(&mut self) {
+    fn exit(&mut self) {
         if self.scopes.len() > 1 {
             self.scopes.pop();
         } else {
@@ -236,7 +367,7 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<&Value> {
+    fn get(&self, name: &str) -> Option<&Value> {
         for scope in self.scopes.iter().rev() {
             if let Some(val) = scope.get(name) {
                 return Some(val);
@@ -246,7 +377,7 @@ impl Environment {
     }
 
     // returns true if successful, and false if variable is not defined
-    pub fn assign(&mut self, name: &str, val: Value) -> bool {
+    fn assign(&mut self, name: &str, val: Value) -> bool {
         for scope in self.scopes.iter_mut().rev() {
             if scope.contains_key(name) {
                 scope.insert(name.to_string(), val);
@@ -256,56 +387,19 @@ impl Environment {
         false
     }
 
-    pub fn define(&mut self, name: &str, val: Value) {
+    fn define(&mut self, name: &str, val: Value) {
         for scope in self.scopes.iter_mut().rev() {
             scope.insert(name.to_string(), val);
             return;
         }
     }
 
-    pub fn is_defined(&self, name: &str) -> bool {
-        for scope in self.scopes.iter().rev() {
-            if scope.contains_key(name) {
-                return true;
-            }
-        }
-        false
-    }
-}
-
-pub fn run(program: &Program) -> Result<(), Error<'_>> {
-    let mut env = Environment::new();
-
-    for stmt in program {
-        execute(stmt, &mut env)?;
-    }
-    Ok(())
-}
-
-fn execute<'a>(stmt: &'a Stmt, env: &mut Environment) -> Result<(), Error<'a>> {
-    match stmt {
-        Stmt::Expr(expr) => {
-            evaluate(expr, env)?;
-        }
-        Stmt::Print(expr) => {
-            let val = evaluate(expr, env)?;
-            println!("{}", val);
-        }
-        Stmt::Var(name, initializer) => {
-            if let Some(expr) = initializer {
-                let val = evaluate(expr, env)?;
-                env.define(name, val);
-            } else {
-                env.define(name, Value::Nil);
-            }
-        }
-        Stmt::Block(stmts) => {
-            env.enter();
-            for stmt in stmts {
-                execute(stmt, env)?;
-            }
-            env.exit();
-        }
-    }
-    Ok(())
+    // fn is_defined(&self, name: &str) -> bool {
+    //     for scope in self.scopes.iter().rev() {
+    //         if scope.contains_key(name) {
+    //             return true;
+    //         }
+    //     }
+    //     false
+    // }
 }
