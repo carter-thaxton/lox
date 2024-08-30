@@ -42,21 +42,25 @@ impl<'a> Parser<'a> {
     fn parse_declaration(&mut self) -> Result<Stmt, Error<'a>> {
         // var <name> (= <expr>)? ;
         if self.matches(TokenKind::Var).is_some() {
-            let name = self
-                .consume_identifier("Expect variable name.")?
-                .to_string();
-
-            if self.matches(TokenKind::Equal).is_some() {
-                let expr = self.parse_expr()?;
-                self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
-                return Ok(Stmt::Var(name, Some(expr)));
-            } else {
-                self.consume(TokenKind::Semicolon, "Expect ';' after var.")?;
-                return Ok(Stmt::Var(name, None));
-            }
+            return Ok(self.parse_var_decl()?);
         }
 
         self.parse_stmt()
+    }
+
+    fn parse_var_decl(&mut self) -> Result<Stmt, Error<'a>> {
+        let name = self
+            .consume_identifier("Expect variable name.")?
+            .to_string();
+
+        if self.matches(TokenKind::Equal).is_some() {
+            let expr = self.parse_expr()?;
+            self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
+            return Ok(Stmt::Var(name, Some(expr)));
+        } else {
+            self.consume(TokenKind::Semicolon, "Expect ';' after var.")?;
+            return Ok(Stmt::Var(name, None));
+        }
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
@@ -105,7 +109,7 @@ impl<'a> Parser<'a> {
             return Ok(Stmt::IfElse(cond, then_branch, else_branch));
         }
 
-        // while (<cond>) <stmt>
+        // while (<cond>) <body>
         if self.matches(TokenKind::While).is_some() {
             self.consume(TokenKind::LeftParen, "Expect '(' after 'while'.")?;
             let cond = self.parse_expr()?;
@@ -114,6 +118,54 @@ impl<'a> Parser<'a> {
             let body = self.parse_stmt()?;
 
             return Ok(Stmt::While(Box::new(cond), Box::new(body)));
+        }
+
+        // for ( (<init>)? ; (<cond>)> ; (<incr>)? ) <body>
+        if self.matches(TokenKind::For).is_some() {
+            self.consume(TokenKind::LeftParen, "Expect '(' after 'for'.")?;
+
+            let init = if self.matches(TokenKind::Semicolon).is_some() {
+                None
+            } else if self.matches(TokenKind::Var).is_some() {
+                Some(self.parse_var_decl()?)
+            } else {
+                Some(self.parse_expr_stmt()?)
+            };
+
+            let cond = if self.matches(TokenKind::Semicolon).is_some() {
+                None
+            } else {
+                Some(self.parse_expr()?)
+            };
+
+            let incr = if self.check(TokenKind::RightParen) {
+                None
+            } else {
+                Some(self.parse_expr()?)
+            };
+
+            self.consume(TokenKind::RightParen, "Expect ')' after for clauses.")?;
+
+            let body = self.parse_stmt()?;
+
+            // desugar to while-loop
+            let body_with_incr = if let Some(incr) = incr {
+                Stmt::Block(vec![body, Stmt::Expr(Box::new(incr))])
+            } else {
+                body
+            };
+
+            let cond = cond.unwrap_or(Expr::Literal(Literal::True));
+
+            let body_with_while = Stmt::While(Box::new(cond), Box::new(body_with_incr));
+
+            let body_with_while = if let Some(init) = init {
+                Stmt::Block(vec![init, body_with_while])
+            } else {
+                body_with_while
+            };
+
+            return Ok(body_with_while);
         }
 
         // { (<stmt>)* }
@@ -137,6 +189,10 @@ impl<'a> Parser<'a> {
         }
 
         // <expr> ;
+        self.parse_expr_stmt()
+    }
+
+    fn parse_expr_stmt(&mut self) -> Result<Stmt, Error<'a>> {
         let expr = self.parse_expr()?;
         self.consume(TokenKind::Semicolon, "Expect ';' after expresssion.")?;
         Ok(Stmt::Expr(Box::new(expr)))
