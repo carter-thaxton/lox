@@ -241,6 +241,36 @@ impl Interpreter {
                 Ok((!equal).into())
             }
 
+            Expr::BinaryExpr {
+                op: Op::And,
+                left,
+                right,
+            } => {
+                let left = self.evaluate(left)?;
+                if left.is_truthy() {
+                    // short-circuit and: only evaluate right when left is truthy
+                    let right = self.evaluate(right)?;
+                    Ok(right)
+                } else {
+                    Ok(left)
+                }
+            }
+
+            Expr::BinaryExpr {
+                op: Op::Or,
+                left,
+                right,
+            } => {
+                let left = self.evaluate(left)?;
+                if !left.is_truthy() {
+                    // short-circuit or: only evaluate right when left is falsey
+                    let right = self.evaluate(right)?;
+                    Ok(right)
+                } else {
+                    Ok(left)
+                }
+            }
+
             Expr::Assign { name, right } => {
                 let right = self.evaluate(right)?;
                 if self.env.assign(name, right.clone()) {

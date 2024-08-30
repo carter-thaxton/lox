@@ -52,6 +52,8 @@ pub enum Op {
     Ge,
     Eq,
     Ne,
+    And,
+    Or,
 }
 
 impl Display for Expr {
@@ -108,6 +110,8 @@ impl Display for Op {
             Op::Ge => ">=",
             Op::Eq => "==",
             Op::Ne => "!=",
+            Op::And => "and",
+            Op::Or => "or",
         };
         write!(f, "{}", s)
     }

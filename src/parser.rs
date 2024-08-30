@@ -117,7 +117,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assignment(&mut self) -> Result<Expr, Error<'a>> {
-        let left = self.parse_equality()?;
+        let left = self.parse_logical_or()?;
 
         // <left> = <right> ;
         if self.matches(TokenKind::Equal).is_some() {
@@ -131,6 +131,38 @@ impl<'a> Parser<'a> {
             } else {
                 return Err(self.parser_error("Invalid assignment target."));
             }
+        }
+
+        Ok(left)
+    }
+
+    fn parse_logical_or(&mut self) -> Result<Expr, Error<'a>> {
+        let mut left = self.parse_logical_and()?;
+
+        // <left> or <right>
+        while self.matches(TokenKind::Or).is_some() {
+            let right = self.parse_logical_and()?;
+            left = Expr::BinaryExpr {
+                op: Op::Or,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_logical_and(&mut self) -> Result<Expr, Error<'a>> {
+        let mut left = self.parse_equality()?;
+
+        // <left> and <right>
+        while self.matches(TokenKind::And).is_some() {
+            let right = self.parse_equality()?;
+            left = Expr::BinaryExpr {
+                op: Op::And,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
 
         Ok(left)
