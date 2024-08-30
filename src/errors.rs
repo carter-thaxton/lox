@@ -20,6 +20,7 @@ pub enum ErrorKind {
     TestExpectedRuntimeError(String),
     TestOutputMismatch(String, String),
     TestOutputMissing(String),
+    TestOutputUnexpected(String),
 }
 
 impl Display for Error<'_> {
@@ -67,6 +68,9 @@ impl Display for ErrorKind {
             }
             ErrorKind::TestOutputMissing(expected) => {
                 write!(f, "FAIL: Expected output: {} - got nothing", expected)
+            }
+            ErrorKind::TestOutputUnexpected(actual) => {
+                write!(f, "FAIL: Unexpected output: {}", actual)
             }
         }
     }
@@ -133,6 +137,13 @@ impl<'a> Error<'a> {
     pub fn test_output_missing(expected: impl Into<String>) -> Self {
         Error {
             kind: ErrorKind::TestOutputMissing(expected.into()),
+            span: None,
+        }
+    }
+
+    pub fn test_output_unexpected(actual: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::TestOutputUnexpected(actual.into()),
             span: None,
         }
     }

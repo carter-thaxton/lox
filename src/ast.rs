@@ -7,6 +7,7 @@ pub enum Stmt {
     Print(Box<Expr>),
     Var(String, Option<Expr>),
     Block(Vec<Stmt>),
+    IfElse(Box<Expr>, Box<Stmt>, Option<Box<Stmt>>),
 
     ExpectOutput(String),
     ExpectRuntimeError(String),

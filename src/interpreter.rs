@@ -104,6 +104,12 @@ impl Interpreter {
         for stmt in program {
             self.execute(stmt)?;
         }
+
+        if self.test {
+            // check that there was no unexpected output
+            self.check_final_output()?;
+        }
+
         Ok(())
     }
 
@@ -313,10 +319,12 @@ impl Interpreter {
             Stmt::Expr(expr) => {
                 self.evaluate(expr)?;
             }
+
             Stmt::Print(expr) => {
                 let val = self.evaluate(expr)?;
                 self.print(&val);
             }
+
             Stmt::Var(name, initializer) => {
                 if let Some(expr) = initializer {
                     let val = self.evaluate(expr)?;
@@ -325,6 +333,7 @@ impl Interpreter {
                     self.env.define(name, Value::Nil);
                 }
             }
+
             Stmt::Block(stmts) => {
                 self.env.enter();
                 for stmt in stmts {
@@ -332,11 +341,23 @@ impl Interpreter {
                 }
                 self.env.exit();
             }
+
+            Stmt::IfElse(cond, then_branch, else_branch) => {
+                let cond = self.evaluate(cond)?;
+                if cond.is_truthy() {
+                    self.execute(then_branch)?;
+                } else if let Some(else_branch) = else_branch {
+                    self.execute(else_branch)?;
+                }
+            }
+
+            // == TEST ==
             Stmt::ExpectOutput(txt) => {
                 if self.test {
                     self.check_output(txt)?;
                 }
             }
+
             Stmt::ExpectRuntimeError(msg) => {
                 if self.test {
                     // reaching here means we did NOT actually get a runtime error before this
@@ -359,6 +380,7 @@ impl Interpreter {
         }
     }
 
+    // == TEST ==
     fn check_output<'a>(&mut self, expected: &'a str) -> Result<(), Error<'a>> {
         if let Some(actual) = self.test_output.pop_front() {
             if actual == expected {
@@ -370,6 +392,13 @@ impl Interpreter {
         } else {
             return Err(Error::test_output_missing(expected));
         }
+    }
+
+    fn check_final_output<'a>(&mut self) -> Result<(), Error<'a>> {
+        if let Some(actual) = self.test_output.pop_front() {
+            return Err(Error::test_output_unexpected(actual));
+        }
+        Ok(())
     }
 }
 

@@ -60,6 +60,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
+        // == TEST ==
         // expect: <output value>
         // expect runtime error: <error message>
         // Error <parser error>
@@ -80,6 +81,26 @@ impl<'a> Parser<'a> {
                 }
                 _ => unreachable!(),
             }
+        }
+
+        // if (<cond>) <then> ( else <else> )?
+        if self.matches(TokenKind::If).is_some() {
+            self.consume(TokenKind::LeftParen, "Expect '(' after 'if'.")?;
+            let cond = self.parse_expr()?;
+            self.consume(TokenKind::RightParen, "Expect ')' after if condition.")?;
+
+            let then_branch = self.parse_stmt()?;
+            let else_branch = if self.matches(TokenKind::Else).is_some() {
+                Some(self.parse_stmt()?)
+            } else {
+                None
+            };
+
+            let cond = Box::new(cond);
+            let then_branch = Box::new(then_branch);
+            let else_branch = else_branch.map(|e| Box::new(e));
+
+            return Ok(Stmt::IfElse(cond, then_branch, else_branch));
         }
 
         // { (<stmt>)* }
