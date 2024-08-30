@@ -1,8 +1,8 @@
 use crate::ast::*;
 use crate::errors::*;
+use colored::Colorize;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Display, Formatter};
-use colored::Colorize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -350,6 +350,12 @@ impl Interpreter {
                     self.execute(else_branch)?;
                 }
             }
+
+            Stmt::While(cond, body) => {
+                while self.evaluate(cond)?.is_truthy() {
+                    self.execute(body)?;
+                }
+            },
 
             // == TEST ==
             Stmt::ExpectOutput(txt) => {

@@ -74,7 +74,9 @@ impl<'a> Parser<'a> {
         }) {
             match tok.kind {
                 TokenKind::ExpectOutput(txt) => return Ok(Stmt::ExpectOutput(txt.to_string())),
-                TokenKind::ExpectRuntimeError(msg) => return Ok(Stmt::ExpectRuntimeError(msg.to_string())),
+                TokenKind::ExpectRuntimeError(msg) => {
+                    return Ok(Stmt::ExpectRuntimeError(msg.to_string()))
+                }
                 TokenKind::ExpectParserError(_msg) => {
                     // ignore this while parsing...
                     continue;
@@ -101,6 +103,17 @@ impl<'a> Parser<'a> {
             let else_branch = else_branch.map(|e| Box::new(e));
 
             return Ok(Stmt::IfElse(cond, then_branch, else_branch));
+        }
+
+        // while (<cond>) <stmt>
+        if self.matches(TokenKind::While).is_some() {
+            self.consume(TokenKind::LeftParen, "Expect '(' after 'while'.")?;
+            let cond = self.parse_expr()?;
+            self.consume(TokenKind::RightParen, "Expect ')' after condition.")?;
+
+            let body = self.parse_stmt()?;
+
+            return Ok(Stmt::While(Box::new(cond), Box::new(body)));
         }
 
         // { (<stmt>)* }
@@ -416,9 +429,7 @@ impl<'a> Parser<'a> {
     // does nothing at EOF or when next token is not an error
     fn matches_err(&mut self) -> Result<(), Error<'a>> {
         match self.lexer.peek() {
-            Some(Err(_)) => {
-                Err(self.lexer.next().unwrap().unwrap_err())
-            }
+            Some(Err(_)) => Err(self.lexer.next().unwrap().unwrap_err()),
             _ => Ok(()),
         }
     }

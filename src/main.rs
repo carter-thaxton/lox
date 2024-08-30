@@ -14,12 +14,11 @@ use interpreter::Interpreter;
 use lexer::{Lexer, Token, TokenKind};
 use parser::Parser;
 
-const EX_USAGE: i32 = 64;       // incorrect command line usage
-const EX_DATAERR: i32 = 65;     // used for lexer and parser errors
-const EX_NOINPUT: i32 = 66;     // invalid input file
-const EX_SOFTWARE: i32 = 70;    // used for runtime errors
-const EX_CONFIG: i32 = 78;      // used for test errors
-
+const EX_USAGE: i32 = 64; // incorrect command line usage
+const EX_DATAERR: i32 = 65; // used for lexer and parser errors
+const EX_NOINPUT: i32 = 66; // invalid input file
+const EX_SOFTWARE: i32 = 70; // used for runtime errors
+const EX_CONFIG: i32 = 78; // used for test errors
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -175,7 +174,12 @@ fn test(input: &str) {
                             println!("{}: expect runtime error: {}", "PASS".green(), actual);
                         } else {
                             let expected = &expected_runtime_errors[0];
-                            println!("{}: Expected runtime error: {} - got: {}", "FAIL".red(), expected, actual);
+                            println!(
+                                "{}: Expected runtime error: {} - got: {}",
+                                "FAIL".red(),
+                                expected,
+                                actual
+                            );
                             std::process::exit(EX_CONFIG);
                         }
                     }
@@ -194,7 +198,12 @@ fn test(input: &str) {
                     println!("{}: expected parser error: {}", "PASS".green(), actual);
                 } else {
                     let expected = &expected_parser_errors[0];
-                    println!("{}: Expected parser error: {} - got: {}", "FAIL".red(), expected, actual);
+                    println!(
+                        "{}: Expected parser error: {} - got: {}",
+                        "FAIL".red(),
+                        expected,
+                        actual
+                    );
                     std::process::exit(EX_CONFIG);
                 }
             }
@@ -208,10 +217,16 @@ fn get_expected_test_errors(input: &str) -> (Vec<Cow<str>>, Vec<&str>) {
     let mut runtime_errors: Vec<&str> = vec![];
     for token in lexer {
         match token {
-            Ok(Token { kind: TokenKind::ExpectParserError(msg), .. }) => {
+            Ok(Token {
+                kind: TokenKind::ExpectParserError(msg),
+                ..
+            }) => {
                 parser_errors.push(msg);
             }
-            Ok(Token { kind: TokenKind::ExpectRuntimeError(msg), .. }) => {
+            Ok(Token {
+                kind: TokenKind::ExpectRuntimeError(msg),
+                ..
+            }) => {
                 runtime_errors.push(msg);
             }
             _ => {}
