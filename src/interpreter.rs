@@ -355,7 +355,7 @@ impl Interpreter {
                 while self.evaluate(cond)?.is_truthy() {
                     self.execute(body)?;
                 }
-            },
+            }
 
             // == TEST ==
             Stmt::ExpectOutput(txt) => {

@@ -1,4 +1,5 @@
 use crate::lexer::Span;
+use colored::Colorize;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
@@ -57,20 +58,33 @@ impl Display for ErrorKind {
             ErrorKind::RuntimeError(msg) => {
                 write!(f, "{}", msg)
             }
+
+            // == TEST ==
             ErrorKind::TestExpectedParserError(msg) => {
-                write!(f, "FAIL: Expected parser error: {}", msg)
+                write!(f, "{}: Expected parser error: {}", "FAIL".red(), msg)
             }
             ErrorKind::TestExpectedRuntimeError(msg) => {
-                write!(f, "FAIL: Expected runtime error: {}", msg)
+                write!(f, "{}: Expected runtime error: {}", "FAIL".red(), msg)
             }
             ErrorKind::TestOutputMismatch(expected, actual) => {
-                write!(f, "FAIL: Expected output: {} - got: {}", expected, actual)
+                write!(
+                    f,
+                    "{}: Expected output: {} - got: {}",
+                    "FAIL".red(),
+                    expected,
+                    actual
+                )
             }
             ErrorKind::TestOutputMissing(expected) => {
-                write!(f, "FAIL: Expected output: {} - got nothing", expected)
+                write!(
+                    f,
+                    "{}: Expected output: {} - got nothing",
+                    "FAIL".red(),
+                    expected
+                )
             }
             ErrorKind::TestOutputUnexpected(actual) => {
-                write!(f, "FAIL: Unexpected output: {}", actual)
+                write!(f, "{}: Unexpected output: {}", "FAIL".red(), actual)
             }
         }
     }
