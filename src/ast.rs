@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 
 pub type Program = Vec<Stmt>;
 
+#[derive(Debug)]
 pub enum Stmt {
     Expr(Box<Expr>),
     Print(Box<Expr>),
@@ -14,6 +15,7 @@ pub enum Stmt {
     ExpectRuntimeError(String),
 }
 
+#[derive(Debug)]
 pub enum Expr {
     Literal(Literal),
     UnaryExpr {
@@ -33,6 +35,7 @@ pub enum Expr {
     },
 }
 
+#[derive(Debug)]
 pub enum Literal {
     Nil,
     True,
@@ -41,6 +44,7 @@ pub enum Literal {
     String(String),
 }
 
+#[derive(Debug)]
 pub enum Op {
     Not,
     Neg,

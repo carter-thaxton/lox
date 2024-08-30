@@ -135,7 +135,9 @@ impl<'a> Parser<'a> {
             let cond = if self.matches(TokenKind::Semicolon).is_some() {
                 None
             } else {
-                Some(self.parse_expr()?)
+                let expr = self.parse_expr()?;
+                self.consume(TokenKind::Semicolon, "Expect ';' after loop condition.")?;
+                Some(expr)
             };
 
             let incr = if self.check(TokenKind::RightParen) {
