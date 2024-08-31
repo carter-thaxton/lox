@@ -150,7 +150,14 @@ impl<'a> Parser<'a> {
 
             let body = self.parse_stmt()?;
 
-            // desugar to while-loop
+            // desugar to while-loop:
+            // {
+            //   <init>
+            //   while (<cond>) {
+            //     <body>
+            //     <incr>
+            //   }
+            // }
             let body_with_incr = if let Some(incr) = incr {
                 Stmt::Block(vec![body, Stmt::Expr(Box::new(incr))])
             } else {
@@ -161,13 +168,13 @@ impl<'a> Parser<'a> {
 
             let body_with_while = Stmt::While(Box::new(cond), Box::new(body_with_incr));
 
-            let body_with_while = if let Some(init) = init {
+            let body_with_init_and_while = if let Some(init) = init {
                 Stmt::Block(vec![init, body_with_while])
             } else {
                 body_with_while
             };
 
-            return Ok(body_with_while);
+            return Ok(body_with_init_and_while);
         }
 
         // { (<stmt>)* }
