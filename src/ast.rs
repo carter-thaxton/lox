@@ -33,6 +33,11 @@ pub enum Expr {
         name: String,
         right: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        args: Vec<Expr>,
+        line: usize,
+    },
 }
 
 #[derive(Debug)]
@@ -71,6 +76,23 @@ impl Display for Expr {
             Expr::BinaryExpr { op, left, right } => write!(f, "({} {} {})", op, left, right),
             Expr::Variable(name) => write!(f, "(var {})", name),
             Expr::Assign { name, right } => write!(f, "({} = {})", name, right),
+            Expr::Call {
+                callee,
+                args,
+                line: _,
+            } => {
+                // (call <callee> (<arg1>, .. <argN>)
+                write!(f, "(call {} (", callee)?;
+                let mut first = true;
+                for arg in args {
+                    if !first {
+                        write!(f, ",")?;
+                    }
+                    write!(f, "{}", arg)?;
+                    first = false;
+                }
+                write!(f, ")")
+            }
         }
     }
 }

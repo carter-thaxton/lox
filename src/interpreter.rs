@@ -289,6 +289,14 @@ impl Interpreter {
                 }
             }
 
+            Expr::Call {
+                callee: _,
+                args: _,
+                line: _,
+            } => {
+                todo!("Implement call");
+            }
+
             _ => Err(Error::runtime_error("Unexpected expression.")),
         }
     }
