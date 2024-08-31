@@ -1,7 +1,9 @@
 #!/bin/bash
 #set -e
 
-cargo build --release
+if [[ -z "$NO_BUILD" ]]; then
+  cargo build --release
+fi
 
 FAIL=0
 for arg in "$@"; do
