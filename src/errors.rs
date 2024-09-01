@@ -1,5 +1,5 @@
-use crate::lexer::Span;
 use crate::interpreter::Value;
+use crate::lexer::Span;
 use colored::Colorize;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
@@ -48,8 +48,8 @@ impl Display for Error<'_> {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            ErrorKind::UnexpectedCharacter(c) => {
-                write!(f, "Unexpected character: {}", c)
+            ErrorKind::UnexpectedCharacter(_) => {
+                write!(f, "Unexpected character.") // ideally, would show invalid character, but this matches tests.
             }
             ErrorKind::UnterminatedString => {
                 write!(f, "Unterminated string.")

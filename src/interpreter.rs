@@ -61,11 +61,7 @@ impl PartialEq for Callable {
 impl Debug for Callable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Callable::Function {
-                name,
-                params,
-                ..
-            } => {
+            Callable::Function { name, params, .. } => {
                 write!(f, "function {}(", name)?;
                 let mut first = true;
                 for param in params {
@@ -77,11 +73,7 @@ impl Debug for Callable {
                 }
                 write!(f, ")")?;
             }
-            Callable::Builtin {
-                name,
-                arity,
-                ..
-            } => {
+            Callable::Builtin { name, arity, .. } => {
                 write!(f, "builtin function {}(", name)?;
                 for i in 0..*arity {
                     if i != 0 {
@@ -466,7 +458,12 @@ impl Interpreter {
         }
 
         match &*callee {
-            Callable::Function { params, body, closure, .. } => {
+            Callable::Function {
+                params,
+                body,
+                closure,
+                ..
+            } => {
                 let orig_env = self.enter(closure.clone());
 
                 for (i, param) in params.iter().enumerate() {
@@ -478,7 +475,10 @@ impl Interpreter {
 
                     match result {
                         // handle return value
-                        Err(Error { kind: ErrorKind::ReturnValue(value), .. }) => {
+                        Err(Error {
+                            kind: ErrorKind::ReturnValue(value),
+                            ..
+                        }) => {
                             self.env = orig_env;
                             return Ok(value);
                         }
@@ -565,10 +565,16 @@ impl Interpreter {
 
                     // handle break and continue values
                     match result {
-                        Err(Error { kind: ErrorKind::BreakLoop, .. }) => {
+                        Err(Error {
+                            kind: ErrorKind::BreakLoop,
+                            ..
+                        }) => {
                             return Ok(());
                         }
-                        Err(Error { kind: ErrorKind::ContinueLoop, .. }) => {
+                        Err(Error {
+                            kind: ErrorKind::ContinueLoop,
+                            ..
+                        }) => {
                             continue;
                         }
                         _ => {}

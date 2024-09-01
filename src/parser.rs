@@ -227,9 +227,12 @@ impl<'a> Parser<'a> {
         }
 
         // return ( <expr> )? ;
-        if self.matches(TokenKind::Return).is_some() {
+        if let Some(tok) = self.matches(TokenKind::Return) {
             if !in_function {
-                return Err(self.parser_error("Can't return from top-level code."));
+                return Err(Error::parser_error(
+                    tok.span,
+                    "Can't return from top-level code.",
+                ));
             }
             let expr = if !self.check(TokenKind::Semicolon) {
                 Some(Box::new(self.parse_expr()?))
@@ -241,18 +244,21 @@ impl<'a> Parser<'a> {
         }
 
         // break ;
-        if self.matches(TokenKind::Break).is_some() {
+        if let Some(tok) = self.matches(TokenKind::Break) {
             if !in_loop {
-                return Err(self.parser_error("Can only break within loop."));
+                return Err(Error::parser_error(tok.span, "Can only break within loop."));
             }
             self.consume(TokenKind::Semicolon, "Expect ';' after break.")?;
             return Ok(Stmt::Break);
         }
 
         // continue ;
-        if self.matches(TokenKind::Continue).is_some() {
+        if let Some(tok) = self.matches(TokenKind::Continue) {
             if !in_loop {
-                return Err(self.parser_error("Can only continue within loop."));
+                return Err(Error::parser_error(
+                    tok.span,
+                    "Can only continue within loop.",
+                ));
             }
             self.consume(TokenKind::Semicolon, "Expect ';' after continue.")?;
             return Ok(Stmt::Continue);
@@ -666,6 +672,7 @@ impl<'a> Parser<'a> {
         if self.check(token) {
             Ok(self.advance())
         } else {
+            self.matches_err()?;
             Err(self.parser_error(message))
         }
     }
