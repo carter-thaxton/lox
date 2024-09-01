@@ -61,7 +61,7 @@ pub enum Expr {
         params: Vec<String>,
         body: Vec<Stmt>,
         line: usize,
-    }
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

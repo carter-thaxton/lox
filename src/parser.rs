@@ -28,7 +28,6 @@ struct LoopContext<'a> {
     post_incr: Option<&'a Expr>,
 }
 
-
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str, enable_test_comments: bool) -> Self {
         Parser {
@@ -60,7 +59,11 @@ impl<'a> Parser<'a> {
     // statements
     //
 
-    fn parse_declaration(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error<'a>> {
+    fn parse_declaration(
+        &mut self,
+        in_function: bool,
+        in_loop: Option<LoopContext>,
+    ) -> Result<Stmt, Error<'a>> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -73,7 +76,7 @@ impl<'a> Parser<'a> {
         // fun <name> ( (<arg>, )* ) { <body> }
         // explicitly look ahead two tokens, for 'fun <name>', to allow for anonymous 'fun' expressions
         if self.check2_p(|t1, t2| *t1 == TokenKind::Fun && matches!(t2, TokenKind::Identifier(_))) {
-            self.advance();  // skip over 'fun'
+            self.advance(); // skip over 'fun'
             return Ok(self.parse_fun_decl(FunctionKind::Function)?);
         }
 
@@ -88,7 +91,10 @@ impl<'a> Parser<'a> {
         if self.matches(TokenKind::Equal).is_some() {
             let expr = self.parse_expr()?;
             self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
-            return Ok(Stmt::Var { name, init: Some(expr) });
+            return Ok(Stmt::Var {
+                name,
+                init: Some(expr),
+            });
         } else {
             self.consume(TokenKind::Semicolon, "Expect ';' after var.")?;
             return Ok(Stmt::Var { name, init: None });
@@ -125,10 +131,19 @@ impl<'a> Parser<'a> {
 
         let body = self.parse_block(true, None)?;
 
-        return Ok(Stmt::Function { name: name.to_string(), params, body, line });
+        return Ok(Stmt::Function {
+            name: name.to_string(),
+            params,
+            body,
+            line,
+        });
     }
 
-    fn parse_stmt(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error<'a>> {
+    fn parse_stmt(
+        &mut self,
+        in_function: bool,
+        in_loop: Option<LoopContext>,
+    ) -> Result<Stmt, Error<'a>> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -150,7 +165,11 @@ impl<'a> Parser<'a> {
             let then_branch = Box::new(then_branch);
             let else_branch = else_branch.map(|e| Box::new(e));
 
-            return Ok(Stmt::IfElse { cond, then_branch, else_branch });
+            return Ok(Stmt::IfElse {
+                cond,
+                then_branch,
+                else_branch,
+            });
         }
 
         // while (<cond>) <body>
@@ -162,7 +181,10 @@ impl<'a> Parser<'a> {
             let loop_context = LoopContext { post_incr: None };
             let body = self.parse_stmt(in_function, Some(loop_context))?;
 
-            return Ok(Stmt::While { cond: Box::new(cond), body: Box::new(body) });
+            return Ok(Stmt::While {
+                cond: Box::new(cond),
+                body: Box::new(body),
+            });
         }
 
         // for ( (<init>)? ; (<cond>)> ; (<incr>)? ) <body>
@@ -193,7 +215,9 @@ impl<'a> Parser<'a> {
 
             self.consume(TokenKind::RightParen, "Expect ')' after for clauses.")?;
 
-            let loop_context = LoopContext { post_incr: incr.as_ref() };
+            let loop_context = LoopContext {
+                post_incr: incr.as_ref(),
+            };
             let body = self.parse_stmt(in_function, Some(loop_context))?;
 
             // desugar to while-loop:
@@ -213,7 +237,10 @@ impl<'a> Parser<'a> {
 
             let cond = cond.unwrap_or(Expr::Literal(Literal::True));
 
-            let body_with_while = Stmt::While { cond: Box::new(cond), body: Box::new(body_with_incr) };
+            let body_with_while = Stmt::While {
+                cond: Box::new(cond),
+                body: Box::new(body_with_incr),
+            };
 
             let body_with_init_and_while = if let Some(init) = init {
                 Stmt::Block(vec![init, body_with_while])
@@ -270,7 +297,7 @@ impl<'a> Parser<'a> {
                 if let Some(incr) = loop_context.post_incr {
                     // if loop-context includes a post-increment expression, then execute it before continuing
                     let incr = Stmt::Expr(Box::new(incr.clone()));
-                    return Ok(Stmt::Block(vec![incr, Stmt::Continue]))
+                    return Ok(Stmt::Block(vec![incr, Stmt::Continue]));
                 } else {
                     return Ok(Stmt::Continue);
                 }
@@ -292,7 +319,11 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expr(Box::new(expr)))
     }
 
-    fn parse_block(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Vec<Stmt>, Error<'a>> {
+    fn parse_block(
+        &mut self,
+        in_function: bool,
+        in_loop: Option<LoopContext>,
+    ) -> Result<Vec<Stmt>, Error<'a>> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
             if self.matches(TokenKind::RightBrace).is_some() {
@@ -801,5 +832,4 @@ impl<'a> Parser<'a> {
         }
         false
     }
-
 }
