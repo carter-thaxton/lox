@@ -17,3 +17,21 @@ count(3);
 // expect: 1
 // expect: 2
 // expect: 3
+
+
+fun makeCounter(start) {
+  var i = start;
+  fun count() {
+    i = i + 1;
+    print i;
+  }
+
+  return count;
+}
+
+var counter1 = makeCounter(1);
+counter1(); // expect: 2
+var counter5 = makeCounter(5);
+counter5(); // expect: 6
+counter1(); // expect: 3
+counter5(); // expect: 7
