@@ -188,13 +188,6 @@ impl Value {
         }
     }
 
-    pub fn is_callable(&self) -> bool {
-        match self {
-            Value::Callable(_) => true,
-            _ => false,
-        }
-    }
-
     fn builtin_fn(
         name: impl Into<String>,
         arity: usize,
