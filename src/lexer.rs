@@ -150,6 +150,16 @@ impl TokenKind<'_> {
             _ => "null".into(),
         }
     }
+
+    #[rustfmt::skip]
+    pub fn is_test(&self) -> bool {
+        match self {
+            TokenKind::ExpectOutput(_)          => true,
+            TokenKind::ExpectParserError(_)     => true,
+            TokenKind::ExpectRuntimeError(_)    => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -319,13 +329,14 @@ impl<'a> Iterator for Lexer<'a> {
                                 (TokenKind::ExpectRuntimeError(txt), span)
                             } else if comment.starts_with("// Error") {
                                 // Error at ...
-                                let txt = comment.strip_prefix("// ").unwrap();
                                 // construct the expected error message with the current line number
-                                let txt = format!("[line {}] {}", self.line, txt);
+                                let txt = comment.strip_prefix("// ").unwrap();
+                                let txt = format!("[line {}] {}", span.line, txt);
                                 (TokenKind::ExpectParserError(txt.into()), span)
                             } else if comment.starts_with("// [line ") && comment.contains(" Error")
                             {
                                 // [line 2] Error at ...
+                                // error message already includes line number
                                 let txt = comment.strip_prefix("// ").unwrap();
                                 (TokenKind::ExpectParserError(Cow::Borrowed(txt)), span)
                             } else {

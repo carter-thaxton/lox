@@ -93,8 +93,13 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new(test: bool) -> Self {
+        let mut env = Environment::new();
+
+        // built-in globals
+        env.define("clock", Value::Nil); // TODO: implement built-in functions
+
         Interpreter {
-            env: Environment::new(),
+            env,
             test,
             test_output: VecDeque::new(),
         }
@@ -290,10 +295,16 @@ impl Interpreter {
             }
 
             Expr::Call {
-                callee: _,
-                args: _,
+                callee,
+                args,
                 line: _,
             } => {
+                let callee = self.evaluate(callee)?;
+                let args: Result<Vec<Value>, Error<'a>> =
+                    args.into_iter().map(|arg| self.evaluate(arg)).collect();
+                let args = args?;
+
+                let _ = (callee, args);
                 todo!("Implement call");
             }
 
@@ -363,6 +374,10 @@ impl Interpreter {
                 while self.evaluate(cond)?.is_truthy() {
                     self.execute(body)?;
                 }
+            }
+
+            Stmt::Function(_name, _args, _body) => {
+                todo!("Implement defintion of function");
             }
 
             // == TEST ==

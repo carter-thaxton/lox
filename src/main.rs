@@ -37,7 +37,10 @@ fn main() {
 
     match command.as_str() {
         "tokenize" => {
-            tokenize(&file_contents);
+            tokenize(&file_contents, false);
+        }
+        "tokenize_test" => {
+            tokenize(&file_contents, true);
         }
         "parse" => {
             parse(&file_contents);
@@ -58,8 +61,8 @@ fn main() {
     }
 }
 
-fn tokenize(input: &str) {
-    let lexer = Lexer::new(input, false);
+fn tokenize(input: &str, enable_test_comments: bool) {
+    let lexer = Lexer::new(input, enable_test_comments);
 
     let mut lexer_error = false;
     for result in lexer {
@@ -195,7 +198,7 @@ fn test(input: &str) {
                 std::process::exit(EX_CONFIG);
             } else {
                 if expected_parser_errors.iter().any(|e| *e == actual) {
-                    println!("{}: expected parser error: {}", "PASS".green(), actual);
+                    println!("{}: expect parser error: {}", "PASS".green(), actual);
                 } else {
                     let expected = &expected_parser_errors[0];
                     println!(

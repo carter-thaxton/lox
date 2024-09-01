@@ -10,6 +10,7 @@ pub enum Stmt {
     Block(Vec<Stmt>),
     IfElse(Box<Expr>, Box<Stmt>, Option<Box<Stmt>>),
     While(Box<Expr>, Box<Stmt>),
+    Function(String, Vec<String>, Vec<Stmt>),
 
     ExpectOutput(String),
     ExpectRuntimeError(String),
