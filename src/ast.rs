@@ -12,6 +12,8 @@ pub enum Stmt {
     While(Box<Expr>, Box<Stmt>),
     Function(String, Vec<String>, Vec<Stmt>, usize),
     Return(Option<Box<Expr>>),
+    Break,
+    Continue,
 
     ExpectOutput(String),
     ExpectRuntimeError(String),

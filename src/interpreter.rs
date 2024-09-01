@@ -476,15 +476,18 @@ impl Interpreter {
                 for stmt in body {
                     let result = self.execute(&stmt);
 
-                    // handle return value
                     match result {
+                        // handle return value
                         Err(Error { kind: ErrorKind::ReturnValue(value), .. }) => {
                             self.env = orig_env;
                             return Ok(value);
                         }
+                        Err(err) => {
+                            self.env = orig_env;
+                            return Err(err);
+                        }
                         _ => {}
                     }
-                    result?;
                 }
 
                 self.env = orig_env;
@@ -538,7 +541,11 @@ impl Interpreter {
             Stmt::Block(stmts) => {
                 let orig_env = self.enter(self.env.clone());
                 for stmt in stmts {
-                    self.execute(stmt)?;
+                    let result = self.execute(stmt);
+                    if result.is_err() {
+                        self.env = orig_env;
+                        return result;
+                    }
                 }
                 self.env = orig_env;
             }
@@ -554,7 +561,19 @@ impl Interpreter {
 
             Stmt::While(cond, body) => {
                 while self.evaluate(cond)?.is_truthy() {
-                    self.execute(body)?;
+                    let result = self.execute(&body);
+
+                    // handle break and continue values
+                    match result {
+                        Err(Error { kind: ErrorKind::BreakLoop, .. }) => {
+                            return Ok(());
+                        }
+                        Err(Error { kind: ErrorKind::ContinueLoop, .. }) => {
+                            continue;
+                        }
+                        _ => {}
+                    }
+                    result?;
                 }
             }
 
@@ -578,6 +597,14 @@ impl Interpreter {
                 };
 
                 return Err(Error::return_value(val));
+            }
+
+            Stmt::Break => {
+                return Err(Error::break_loop());
+            }
+
+            Stmt::Continue => {
+                return Err(Error::continue_loop());
             }
 
             // == TEST ==

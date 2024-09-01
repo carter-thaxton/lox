@@ -39,7 +39,7 @@ impl<'a> Parser<'a> {
         let mut program = Vec::new();
 
         while !self.at_eof() {
-            let stmt = self.parse_declaration()?;
+            let stmt = self.parse_declaration(false, false)?;
             program.push(stmt);
         }
 
@@ -54,7 +54,7 @@ impl<'a> Parser<'a> {
     // statements
     //
 
-    fn parse_declaration(&mut self) -> Result<Stmt, Error<'a>> {
+    fn parse_declaration(&mut self, in_function: bool, in_loop: bool) -> Result<Stmt, Error<'a>> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -69,7 +69,7 @@ impl<'a> Parser<'a> {
             return Ok(self.parse_fun_decl(FunctionKind::Function)?);
         }
 
-        self.parse_stmt()
+        self.parse_stmt(in_function, in_loop)
     }
 
     fn parse_var_decl(&mut self) -> Result<Stmt, Error<'a>> {
@@ -115,12 +115,12 @@ impl<'a> Parser<'a> {
             format!("Expect '{{' before {} body.", kind),
         )?;
 
-        let body = self.parse_block()?;
+        let body = self.parse_block(true, false)?;
 
         return Ok(Stmt::Function(name.to_string(), params, body, line));
     }
 
-    fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
+    fn parse_stmt(&mut self, in_function: bool, in_loop: bool) -> Result<Stmt, Error<'a>> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -131,9 +131,9 @@ impl<'a> Parser<'a> {
             let cond = self.parse_expr()?;
             self.consume(TokenKind::RightParen, "Expect ')' after if condition.")?;
 
-            let then_branch = self.parse_stmt()?;
+            let then_branch = self.parse_stmt(in_function, in_loop)?;
             let else_branch = if self.matches(TokenKind::Else).is_some() {
-                Some(self.parse_stmt()?)
+                Some(self.parse_stmt(in_function, in_loop)?)
             } else {
                 None
             };
@@ -151,7 +151,7 @@ impl<'a> Parser<'a> {
             let cond = self.parse_expr()?;
             self.consume(TokenKind::RightParen, "Expect ')' after condition.")?;
 
-            let body = self.parse_stmt()?;
+            let body = self.parse_stmt(in_function, true)?;
 
             return Ok(Stmt::While(Box::new(cond), Box::new(body)));
         }
@@ -184,7 +184,7 @@ impl<'a> Parser<'a> {
 
             self.consume(TokenKind::RightParen, "Expect ')' after for clauses.")?;
 
-            let body = self.parse_stmt()?;
+            let body = self.parse_stmt(in_function, true)?;
 
             // desugar to while-loop:
             // {
@@ -215,7 +215,7 @@ impl<'a> Parser<'a> {
 
         // { (<stmt>)* }
         if self.matches(TokenKind::LeftBrace).is_some() {
-            let stmts = self.parse_block()?;
+            let stmts = self.parse_block(in_function, in_loop)?;
             return Ok(Stmt::Block(stmts));
         }
 
@@ -228,6 +228,9 @@ impl<'a> Parser<'a> {
 
         // return ( <expr> )? ;
         if self.matches(TokenKind::Return).is_some() {
+            if !in_function {
+                return Err(self.parser_error("Can't return from top-level code."));
+            }
             let expr = if !self.check(TokenKind::Semicolon) {
                 Some(Box::new(self.parse_expr()?))
             } else {
@@ -235,6 +238,24 @@ impl<'a> Parser<'a> {
             };
             self.consume(TokenKind::Semicolon, "Expect ';' after return value.")?;
             return Ok(Stmt::Return(expr));
+        }
+
+        // break ;
+        if self.matches(TokenKind::Break).is_some() {
+            if !in_loop {
+                return Err(self.parser_error("Can only break within loop."));
+            }
+            self.consume(TokenKind::Semicolon, "Expect ';' after break.")?;
+            return Ok(Stmt::Break);
+        }
+
+        // continue ;
+        if self.matches(TokenKind::Continue).is_some() {
+            if !in_loop {
+                return Err(self.parser_error("Can only continue within loop."));
+            }
+            self.consume(TokenKind::Semicolon, "Expect ';' after continue.")?;
+            return Ok(Stmt::Continue);
         }
 
         // <expr> ;
@@ -247,13 +268,13 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expr(Box::new(expr)))
     }
 
-    fn parse_block(&mut self) -> Result<Vec<Stmt>, Error<'a>> {
+    fn parse_block(&mut self, in_function: bool, in_loop: bool) -> Result<Vec<Stmt>, Error<'a>> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
             if self.matches(TokenKind::RightBrace).is_some() {
                 return Ok(stmts);
             }
-            let stmt = self.parse_declaration()?;
+            let stmt = self.parse_declaration(in_function, in_loop)?;
             stmts.push(stmt);
         }
         return Err(self.parser_error("Expect '}' after block."));
@@ -299,7 +320,7 @@ impl<'a> Parser<'a> {
         let left = self.parse_logical_or()?;
 
         // <left> = <right> ;
-        if self.matches(TokenKind::Equal).is_some() {
+        if let Some(tok) = self.matches(TokenKind::Equal) {
             // <left> must be an L-value
             if let Expr::Variable(name) = left {
                 let right = self.parse_assignment()?;
@@ -308,7 +329,8 @@ impl<'a> Parser<'a> {
                     right: Box::new(right),
                 });
             } else {
-                return Err(self.parser_error("Invalid assignment target."));
+                // return error referring to '='
+                return Err(Error::parser_error(tok.span, "Invalid assignment target."));
             }
         }
 
@@ -598,7 +620,7 @@ impl<'a> Parser<'a> {
     }
 
     // peeks ahead without advancing, to see if the next token matches the given kind
-    fn check(&mut self, token: TokenKind<'_>) -> bool {
+    fn check(&mut self, token: TokenKind<'a>) -> bool {
         if let Some(Ok(kind)) = self.peek() {
             if *kind == token {
                 return true;
@@ -608,7 +630,7 @@ impl<'a> Parser<'a> {
     }
 
     // like check, but advances when successful, returning the whole token if it does
-    fn matches(&mut self, token: TokenKind<'_>) -> Option<Token<'_>> {
+    fn matches(&mut self, token: TokenKind<'a>) -> Option<Token<'a>> {
         if self.check(token) {
             Some(self.advance())
         } else {
@@ -638,7 +660,7 @@ impl<'a> Parser<'a> {
     // like matches, but produces a parser error if it doesn't match
     fn consume(
         &mut self,
-        token: TokenKind<'_>,
+        token: TokenKind<'a>,
         message: impl Into<String>,
     ) -> Result<Token<'a>, Error<'a>> {
         if self.check(token) {
@@ -650,7 +672,7 @@ impl<'a> Parser<'a> {
 
     // versions of the above, for multiple TokenKinds, or for arbitrary predicates
 
-    fn check_n(&mut self, tokens: &[TokenKind<'_>]) -> bool {
+    fn check_n(&mut self, tokens: &[TokenKind<'a>]) -> bool {
         if let Some(Ok(kind)) = self.peek() {
             if tokens.contains(kind) {
                 return true;
@@ -659,7 +681,7 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn matches_n(&mut self, tokens: &[TokenKind<'_>]) -> Option<Token<'_>> {
+    fn matches_n(&mut self, tokens: &[TokenKind<'a>]) -> Option<Token<'_>> {
         if self.check_n(tokens) {
             Some(self.advance())
         } else {
@@ -692,7 +714,7 @@ impl<'a> Parser<'a> {
 
     // fn consume_p<P>(&mut self, pred: P, message: impl Into<String>) -> Result<Token<'a>, Error<'a>>
     // where
-    //     P: FnOnce(&TokenKind<'_>) -> bool
+    //     P: FnOnce(&TokenKind<'a>) -> bool
     // {
     //     if self.check_p(pred) {
     //         Ok(self.advance())

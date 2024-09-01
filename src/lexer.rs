@@ -59,7 +59,9 @@ pub enum TokenKind<'a> {
 
     // keywords
     And,
+    Break,
     Class,
+    Continue,
     Else,
     False,
     For,
@@ -115,7 +117,9 @@ impl TokenKind<'_> {
             TokenKind::Number(_)        => "NUMBER",
             TokenKind::Identifier(_)    => "IDENTIFIER",
             TokenKind::And              => "AND",
+            TokenKind::Break            => "BREAK",
             TokenKind::Class            => "CLASS",
+            TokenKind::Continue         => "CONTINUE",
             TokenKind::Else             => "ELSE",
             TokenKind::False            => "FALSE",
             TokenKind::For              => "FOR",
@@ -403,7 +407,9 @@ impl<'a> Iterator for Lexer<'a> {
 
                     let kind = match span.lexeme {
                         "and"       => TokenKind::And,
+                        "break"     => TokenKind::Break,
                         "class"     => TokenKind::Class,
+                        "continue"  => TokenKind::Continue,
                         "else"      => TokenKind::Else,
                         "false"     => TokenKind::False,
                         "for"       => TokenKind::For,

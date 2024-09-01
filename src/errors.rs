@@ -17,7 +17,10 @@ pub enum ErrorKind {
     InvalidNumber(String),
     ParserError(String),
     RuntimeError(String),
+
     ReturnValue(Value),
+    BreakLoop,
+    ContinueLoop,
 
     TestExpectedParserError(String),
     TestExpectedRuntimeError(String),
@@ -87,9 +90,15 @@ impl Display for ErrorKind {
             }
             ErrorKind::TestOutputUnexpected(actual) => {
                 write!(f, "{}: Unexpected output: {}", "FAIL".red(), actual)
-            },
+            }
             ErrorKind::ReturnValue(value) => {
                 write!(f, "Return value: {}", value)
+            }
+            ErrorKind::BreakLoop => {
+                write!(f, "break")
+            }
+            ErrorKind::ContinueLoop => {
+                write!(f, "continue")
             }
         }
     }
@@ -204,6 +213,20 @@ impl Error<'static> {
     pub fn return_value(value: Value) -> Self {
         Error {
             kind: ErrorKind::ReturnValue(value),
+            span: None,
+        }
+    }
+
+    pub fn break_loop() -> Self {
+        Error {
+            kind: ErrorKind::BreakLoop,
+            span: None,
+        }
+    }
+
+    pub fn continue_loop() -> Self {
+        Error {
+            kind: ErrorKind::ContinueLoop,
             span: None,
         }
     }
