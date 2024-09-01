@@ -6,11 +6,26 @@ pub type Program = Vec<Stmt>;
 pub enum Stmt {
     Expr(Box<Expr>),
     Print(Box<Expr>),
-    Var(String, Option<Expr>),
+    Var {
+        name: String,
+        init: Option<Expr>,
+    },
     Block(Vec<Stmt>),
-    IfElse(Box<Expr>, Box<Stmt>, Option<Box<Stmt>>),
-    While(Box<Expr>, Box<Stmt>),
-    Function(String, Vec<String>, Vec<Stmt>, usize),
+    IfElse {
+        cond: Box<Expr>,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
+    While {
+        cond: Box<Expr>,
+        body: Box<Stmt>,
+    },
+    Function {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+        line: usize,
+    },
     Return(Option<Box<Expr>>),
     Break,
     Continue,
@@ -42,6 +57,11 @@ pub enum Expr {
         args: Vec<Expr>,
         line: usize,
     },
+    Function {
+        params: Vec<String>,
+        body: Vec<Stmt>,
+        line: usize,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,7 +105,7 @@ impl Display for Expr {
                 args,
                 line: _,
             } => {
-                // (call <callee> (<arg1>, .. <argN>)
+                // (call <callee> (<arg1>, .. <argN>))
                 write!(f, "(call {} (", callee)?;
                 let mut first = true;
                 for arg in args {
@@ -95,7 +115,20 @@ impl Display for Expr {
                     write!(f, "{}", arg)?;
                     first = false;
                 }
-                write!(f, ")")
+                write!(f, "))")
+            }
+            Expr::Function { params, .. } => {
+                // (fun (<param1>, .. <paramN>))
+                write!(f, "(fun (")?;
+                let mut first = true;
+                for param in params {
+                    if !first {
+                        write!(f, ",")?;
+                    }
+                    write!(f, "{}", param)?;
+                    first = false;
+                }
+                write!(f, "))")
             }
         }
     }

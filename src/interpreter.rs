@@ -529,8 +529,8 @@ impl Interpreter {
                 self.print(&val);
             }
 
-            Stmt::Var(name, initializer) => {
-                if let Some(expr) = initializer {
+            Stmt::Var { name, init } => {
+                if let Some(expr) = init {
                     let val = self.evaluate(expr)?;
                     self.env.borrow_mut().define(name, val);
                 } else {
@@ -550,7 +550,7 @@ impl Interpreter {
                 self.env = orig_env;
             }
 
-            Stmt::IfElse(cond, then_branch, else_branch) => {
+            Stmt::IfElse { cond, then_branch, else_branch } => {
                 let cond = self.evaluate(cond)?;
                 if cond.is_truthy() {
                     self.execute(then_branch)?;
@@ -559,7 +559,7 @@ impl Interpreter {
                 }
             }
 
-            Stmt::While(cond, body) => {
+            Stmt::While { cond, body } => {
                 while self.evaluate(cond)?.is_truthy() {
                     let result = self.execute(&body);
 
@@ -583,7 +583,7 @@ impl Interpreter {
                 }
             }
 
-            Stmt::Function(name, params, body, line) => {
+            Stmt::Function { name, params, body, line } => {
                 let fcn = Value::Callable(Rc::new(Callable::Function {
                     name: name.to_string(),
                     params: params.to_vec(),
