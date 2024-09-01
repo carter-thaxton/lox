@@ -23,6 +23,12 @@ pub struct Parser<'a> {
     last_line: usize,
 }
 
+#[derive(Clone, Copy)]
+struct LoopContext<'a> {
+    post_incr: Option<&'a Expr>,
+}
+
+
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str, enable_test_comments: bool) -> Self {
         Parser {
@@ -39,7 +45,7 @@ impl<'a> Parser<'a> {
         let mut program = Vec::new();
 
         while !self.at_eof() {
-            let stmt = self.parse_declaration(false, false)?;
+            let stmt = self.parse_declaration(false, None)?;
             program.push(stmt);
         }
 
@@ -54,7 +60,7 @@ impl<'a> Parser<'a> {
     // statements
     //
 
-    fn parse_declaration(&mut self, in_function: bool, in_loop: bool) -> Result<Stmt, Error<'a>> {
+    fn parse_declaration(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error<'a>> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -115,12 +121,12 @@ impl<'a> Parser<'a> {
             format!("Expect '{{' before {} body.", kind),
         )?;
 
-        let body = self.parse_block(true, false)?;
+        let body = self.parse_block(true, None)?;
 
         return Ok(Stmt::Function(name.to_string(), params, body, line));
     }
 
-    fn parse_stmt(&mut self, in_function: bool, in_loop: bool) -> Result<Stmt, Error<'a>> {
+    fn parse_stmt(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error<'a>> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -151,7 +157,8 @@ impl<'a> Parser<'a> {
             let cond = self.parse_expr()?;
             self.consume(TokenKind::RightParen, "Expect ')' after condition.")?;
 
-            let body = self.parse_stmt(in_function, true)?;
+            let loop_context = LoopContext { post_incr: None };
+            let body = self.parse_stmt(in_function, Some(loop_context))?;
 
             return Ok(Stmt::While(Box::new(cond), Box::new(body)));
         }
@@ -184,7 +191,8 @@ impl<'a> Parser<'a> {
 
             self.consume(TokenKind::RightParen, "Expect ')' after for clauses.")?;
 
-            let body = self.parse_stmt(in_function, true)?;
+            let loop_context = LoopContext { post_incr: incr.as_ref() };
+            let body = self.parse_stmt(in_function, Some(loop_context))?;
 
             // desugar to while-loop:
             // {
@@ -194,6 +202,7 @@ impl<'a> Parser<'a> {
             //     <incr>
             //   }
             // }
+
             let body_with_incr = if let Some(incr) = incr {
                 Stmt::Block(vec![body, Stmt::Expr(Box::new(incr))])
             } else {
@@ -245,7 +254,7 @@ impl<'a> Parser<'a> {
 
         // break ;
         if let Some(tok) = self.matches(TokenKind::Break) {
-            if !in_loop {
+            if !in_loop.is_some() {
                 return Err(Error::parser_error(tok.span, "Can only break within loop."));
             }
             self.consume(TokenKind::Semicolon, "Expect ';' after break.")?;
@@ -254,14 +263,21 @@ impl<'a> Parser<'a> {
 
         // continue ;
         if let Some(tok) = self.matches(TokenKind::Continue) {
-            if !in_loop {
+            if let Some(loop_context) = in_loop {
+                self.consume(TokenKind::Semicolon, "Expect ';' after continue.")?;
+                if let Some(incr) = loop_context.post_incr {
+                    // if loop-context includes a post-increment expression, then execute it before continuing
+                    let incr = Stmt::Expr(Box::new(incr.clone()));
+                    return Ok(Stmt::Block(vec![incr, Stmt::Continue]))
+                } else {
+                    return Ok(Stmt::Continue);
+                }
+            } else {
                 return Err(Error::parser_error(
                     tok.span,
                     "Can only continue within loop.",
                 ));
             }
-            self.consume(TokenKind::Semicolon, "Expect ';' after continue.")?;
-            return Ok(Stmt::Continue);
         }
 
         // <expr> ;
@@ -274,7 +290,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expr(Box::new(expr)))
     }
 
-    fn parse_block(&mut self, in_function: bool, in_loop: bool) -> Result<Vec<Stmt>, Error<'a>> {
+    fn parse_block(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Vec<Stmt>, Error<'a>> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
             if self.matches(TokenKind::RightBrace).is_some() {

@@ -563,7 +563,7 @@ impl Interpreter {
                 while self.evaluate(cond)?.is_truthy() {
                     let result = self.execute(&body);
 
-                    // handle break and continue values
+                    // handle break and continue statements, implemented as special errors
                     match result {
                         Err(Error {
                             kind: ErrorKind::BreakLoop,
