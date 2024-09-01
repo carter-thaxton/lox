@@ -5,13 +5,22 @@ if [[ -z "$NO_BUILD" ]]; then
   cargo build --release
 fi
 
+PASS=0
 FAIL=0
 for arg in "$@"; do
   while read -r file; do
     echo
     echo "$file";
-    target/release/lox test "$file" || FAIL=1;
+    if target/release/lox test "$file"; then
+      ((PASS++))
+    else
+      ((FAIL++))
+    fi
   done < <(find $arg -type f)
 done
 
-exit $FAIL
+echo
+echo "$PASS tests passed, $FAIL tests failed."
+if (( FAIL > 0 )); then
+  exit 1
+fi
