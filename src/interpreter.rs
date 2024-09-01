@@ -478,12 +478,21 @@ impl Interpreter {
                 }
 
                 for stmt in body {
-                    self.execute(&stmt)?;
+                    let result = self.execute(&stmt);
+
+                    // handle return value
+                    match result {
+                        Err(Error { kind: ErrorKind::ReturnValue(value), .. }) => {
+                            self.exit();
+                            return Ok(value);
+                        }
+                        _ => {}
+                    }
+                    result?;
                 }
 
                 self.exit();
-
-                Ok(Value::Nil) // TODO: implement return value
+                Ok(Value::Nil)
             }
             Callable::Builtin { fcn, .. } => Ok(fcn(args)?),
         }
@@ -562,6 +571,16 @@ impl Interpreter {
                 }));
 
                 self.env().define(name, fcn);
+            }
+
+            Stmt::Return(expr) => {
+                let val = if let Some(expr) = expr {
+                    self.evaluate(expr)?
+                } else {
+                    Value::Nil
+                };
+
+                return Err(Error::return_value(val));
             }
 
             // == TEST ==

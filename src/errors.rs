@@ -1,4 +1,5 @@
 use crate::lexer::Span;
+use crate::interpreter::Value;
 use colored::Colorize;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
@@ -16,6 +17,7 @@ pub enum ErrorKind {
     InvalidNumber(String),
     ParserError(String),
     RuntimeError(String),
+    ReturnValue(Value),
 
     TestExpectedParserError(String),
     TestExpectedRuntimeError(String),
@@ -85,6 +87,9 @@ impl Display for ErrorKind {
             }
             ErrorKind::TestOutputUnexpected(actual) => {
                 write!(f, "{}: Unexpected output: {}", "FAIL".red(), actual)
+            },
+            ErrorKind::ReturnValue(value) => {
+                write!(f, "Return value: {}", value)
             }
         }
     }
@@ -193,6 +198,13 @@ impl Error<'static> {
         Error {
             kind: ErrorKind::RuntimeError(message.into()),
             span: Some(Span::dummy_for_line(line)),
+        }
+    }
+
+    pub fn return_value(value: Value) -> Self {
+        Error {
+            kind: ErrorKind::ReturnValue(value),
+            span: None,
         }
     }
 }

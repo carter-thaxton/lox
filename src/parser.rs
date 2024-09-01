@@ -226,6 +226,17 @@ impl<'a> Parser<'a> {
             return Ok(Stmt::Print(Box::new(expr)));
         }
 
+        // return ( <expr> )? ;
+        if self.matches(TokenKind::Return).is_some() {
+            let expr = if !self.check(TokenKind::Semicolon) {
+                Some(Box::new(self.parse_expr()?))
+            } else {
+                None
+            };
+            self.consume(TokenKind::Semicolon, "Expect ';' after return value.")?;
+            return Ok(Stmt::Return(expr));
+        }
+
         // <expr> ;
         self.parse_expr_stmt()
     }

@@ -11,6 +11,7 @@ pub enum Stmt {
     IfElse(Box<Expr>, Box<Stmt>, Option<Box<Stmt>>),
     While(Box<Expr>, Box<Stmt>),
     Function(String, Vec<String>, Vec<Stmt>, usize),
+    Return(Option<Box<Expr>>),
 
     ExpectOutput(String),
     ExpectRuntimeError(String),
