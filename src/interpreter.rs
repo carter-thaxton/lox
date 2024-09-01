@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::errors::*;
 use colored::Colorize;
+use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::rc::Rc;
@@ -12,6 +13,7 @@ pub enum Callable {
         params: Vec<String>,
         body: Vec<Stmt>,
         line: usize,
+        closure: Rc<RefCell<Environment>>,
     },
     Builtin {
         name: String,
@@ -30,12 +32,14 @@ impl PartialEq for Callable {
                     params: my_params,
                     body: my_body,
                     line: my_line,
+                    ..
                 },
                 Callable::Function {
                     name,
                     params,
                     body,
                     line,
+                    ..
                 },
             ) => my_name == name && my_params == params && my_body == body && my_line == line,
             (
@@ -60,8 +64,7 @@ impl Debug for Callable {
             Callable::Function {
                 name,
                 params,
-                body: _,
-                line: _,
+                ..
             } => {
                 write!(f, "function {}(", name)?;
                 let mut first = true;
@@ -77,7 +80,7 @@ impl Debug for Callable {
             Callable::Builtin {
                 name,
                 arity,
-                fcn: _,
+                ..
             } => {
                 write!(f, "builtin function {}(", name)?;
                 for i in 0..*arity {
@@ -217,7 +220,7 @@ fn clock(start_time: &Instant) -> f64 {
 }
 
 pub struct Interpreter {
-    env: Option<Environment>,
+    env: Rc<RefCell<Environment>>,
     test: bool,
     test_output: VecDeque<String>,
 }
@@ -237,7 +240,7 @@ impl Interpreter {
         env.define("clock", clock_fn);
 
         Interpreter {
-            env: Some(env),
+            env: Rc::new(RefCell::new(env)),
             test,
             test_output: VecDeque::new(),
         }
@@ -263,7 +266,7 @@ impl Interpreter {
             Expr::Group(expr) => self.evaluate(expr),
 
             Expr::Variable(name) => {
-                if let Some(val) = self.env().get(name) {
+                if let Some(val) = self.env.borrow().get(name) {
                     Ok(val.clone())
                 } else {
                     Err(Error::runtime_error(format!(
@@ -422,7 +425,7 @@ impl Interpreter {
 
             Expr::Assign { name, right } => {
                 let right = self.evaluate(right)?;
-                if self.env().assign(name, right.clone()) {
+                if self.env.borrow_mut().assign(name, right.clone()) {
                     Ok(right)
                 } else {
                     Err(Error::runtime_error(format!(
@@ -463,11 +466,11 @@ impl Interpreter {
         }
 
         match &*callee {
-            Callable::Function { params, body, .. } => {
-                self.enter();
+            Callable::Function { params, body, closure, .. } => {
+                let orig_env = self.enter(closure.clone());
 
                 for (i, param) in params.iter().enumerate() {
-                    self.env().define(param, args[i].clone());
+                    self.env.borrow_mut().define(param, args[i].clone());
                 }
 
                 for stmt in body {
@@ -476,7 +479,7 @@ impl Interpreter {
                     // handle return value
                     match result {
                         Err(Error { kind: ErrorKind::ReturnValue(value), .. }) => {
-                            self.exit();
+                            self.env = orig_env;
                             return Ok(value);
                         }
                         _ => {}
@@ -484,7 +487,7 @@ impl Interpreter {
                     result?;
                 }
 
-                self.exit();
+                self.env = orig_env;
                 Ok(Value::Nil)
             }
             Callable::Builtin { fcn, .. } => Ok(fcn(args)?),
@@ -526,18 +529,18 @@ impl Interpreter {
             Stmt::Var(name, initializer) => {
                 if let Some(expr) = initializer {
                     let val = self.evaluate(expr)?;
-                    self.env().define(name, val);
+                    self.env.borrow_mut().define(name, val);
                 } else {
-                    self.env().define(name, Value::Nil);
+                    self.env.borrow_mut().define(name, Value::Nil);
                 }
             }
 
             Stmt::Block(stmts) => {
-                self.enter();
+                let orig_env = self.enter(self.env.clone());
                 for stmt in stmts {
                     self.execute(stmt)?;
                 }
-                self.exit();
+                self.env = orig_env;
             }
 
             Stmt::IfElse(cond, then_branch, else_branch) => {
@@ -561,9 +564,10 @@ impl Interpreter {
                     params: params.to_vec(),
                     body: body.to_vec(),
                     line: *line,
+                    closure: Rc::clone(&self.env),
                 }));
 
-                self.env().define(name, fcn);
+                self.env.borrow_mut().define(name, fcn);
             }
 
             Stmt::Return(expr) => {
@@ -593,19 +597,10 @@ impl Interpreter {
         Ok(())
     }
 
-    fn env(&mut self) -> &mut Environment {
-        self.env.as_mut().unwrap()
-    }
-
-    fn enter(&mut self) {
-        let env = self.env.take().unwrap();
-        self.env = Some(Environment::new(env));
-    }
-
-    fn exit(&mut self) {
-        let env = self.env.take().unwrap();
-        let env = *env.parent.expect("Attempt to exit the global scope");
-        self.env = Some(env);
+    fn enter(&mut self, env: Rc<RefCell<Environment>>) -> Rc<RefCell<Environment>> {
+        let orig_env = Rc::clone(&self.env);
+        self.env = Rc::new(RefCell::new(Environment::new(env)));
+        orig_env
     }
 
     fn print(&mut self, val: &Value) {
@@ -645,7 +640,7 @@ impl Interpreter {
 #[derive(Clone)]
 pub struct Environment {
     variables: HashMap<String, Value>,
-    parent: Option<Box<Environment>>,
+    parent: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -656,20 +651,20 @@ impl Environment {
         }
     }
 
-    fn new(parent: Environment) -> Self {
+    fn new(parent: Rc<RefCell<Environment>>) -> Self {
         Environment {
             variables: HashMap::new(),
-            parent: Some(Box::new(parent)),
+            parent: Some(Rc::clone(&parent)),
         }
     }
 
-    fn get(&self, name: &str) -> Option<&Value> {
+    fn get(&self, name: &str) -> Option<Value> {
         if let Some(val) = self.variables.get(name) {
-            return Some(val);
+            return Some(val.clone());
         }
 
         match &self.parent {
-            Some(parent) => parent.get(name),
+            Some(parent) => parent.borrow().get(name),
             None => None,
         }
     }
@@ -682,7 +677,7 @@ impl Environment {
         }
 
         match &mut self.parent {
-            Some(parent) => parent.assign(name, val),
+            Some(parent) => parent.borrow_mut().assign(name, val),
             None => false,
         }
     }
