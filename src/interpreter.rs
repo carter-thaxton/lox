@@ -224,14 +224,15 @@ fn clock(start_time: &Instant) -> f64 {
 }
 
 pub struct Interpreter {
-    env: Environment,
+    global_env: Environment,
+    env: Option<Environment>,
     test: bool,
     test_output: VecDeque<String>,
 }
 
 impl Interpreter {
     pub fn new(test: bool) -> Self {
-        let mut env = Environment::new();
+        let mut env = Environment::global();
 
         // built-in globals
         let start_time = Instant::now();
@@ -244,7 +245,8 @@ impl Interpreter {
         env.define("clock", clock_fn);
 
         Interpreter {
-            env,
+            global_env: env.clone(),
+            env: Some(env),
             test,
             test_output: VecDeque::new(),
         }
@@ -270,7 +272,7 @@ impl Interpreter {
             Expr::Group(expr) => self.evaluate(expr),
 
             Expr::Variable(name) => {
-                if let Some(val) = self.env.get(name) {
+                if let Some(val) = self.env().get(name) {
                     Ok(val.clone())
                 } else {
                     Err(Error::runtime_error(format!(
@@ -429,7 +431,7 @@ impl Interpreter {
 
             Expr::Assign { name, right } => {
                 let right = self.evaluate(right)?;
-                if self.env.assign(name, right.clone()) {
+                if self.env().assign(name, right.clone()) {
                     Ok(right)
                 } else {
                     Err(Error::runtime_error(format!(
@@ -471,14 +473,19 @@ impl Interpreter {
 
         match &*callee {
             Callable::Function { params, body, .. } => {
-                self.env.enter();
+                let orig_env = self.env.take().unwrap();
+                self.env = Some(Environment::new(self.global_env.clone()));
+
                 for (i, param) in params.iter().enumerate() {
-                    self.env.define(param, args[i].clone());
+                    self.env().define(param, args[i].clone());
                 }
+
                 for stmt in body {
                     self.execute(&stmt)?;
                 }
-                self.env.exit();
+
+                self.env = Some(orig_env);
+
                 Ok(Value::Nil) // TODO: implement return value
             }
             Callable::Builtin { fcn, .. } => Ok(fcn(args)?),
@@ -520,18 +527,18 @@ impl Interpreter {
             Stmt::Var(name, initializer) => {
                 if let Some(expr) = initializer {
                     let val = self.evaluate(expr)?;
-                    self.env.define(name, val);
+                    self.env().define(name, val);
                 } else {
-                    self.env.define(name, Value::Nil);
+                    self.env().define(name, Value::Nil);
                 }
             }
 
             Stmt::Block(stmts) => {
-                self.env.enter();
+                self.enter();
                 for stmt in stmts {
                     self.execute(stmt)?;
                 }
-                self.env.exit();
+                self.exit();
             }
 
             Stmt::IfElse(cond, then_branch, else_branch) => {
@@ -557,7 +564,7 @@ impl Interpreter {
                     line: *line,
                 }));
 
-                self.env.define(name, fcn);
+                self.env().define(name, fcn);
             }
 
             // == TEST ==
@@ -575,6 +582,21 @@ impl Interpreter {
             }
         }
         Ok(())
+    }
+
+    fn env(&mut self) -> &mut Environment {
+        self.env.as_mut().unwrap()
+    }
+
+    fn enter(&mut self) {
+        let env = self.env.take().unwrap();
+        self.env = Some(Environment::new(env));
+    }
+
+    fn exit(&mut self) {
+        let env = self.env.take().unwrap();
+        let env = *env.parent.expect("Attempt to exit the global scope");
+        self.env = Some(env);
     }
 
     fn print(&mut self, val: &Value) {
@@ -611,66 +633,63 @@ impl Interpreter {
     }
 }
 
+#[derive(Clone)]
 pub struct Environment {
-    scopes: Vec<HashMap<String, Value>>,
+    variables: HashMap<String, Value>,
+    parent: Option<Box<Environment>>,
 }
 
 impl Environment {
-    // creates a new environment in the outer-most scope
-    fn new() -> Self {
+    fn global() -> Self {
         Environment {
-            scopes: vec![HashMap::new()],
+            variables: HashMap::new(),
+            parent: None,
         }
     }
 
-    // enter a new local scope
-    fn enter(&mut self) {
-        self.scopes.push(HashMap::new());
-    }
-
-    // exit the outer-most scope
-    // panics if attempting to exit the global scope
-    fn exit(&mut self) {
-        if self.scopes.len() > 1 {
-            self.scopes.pop();
-        } else {
-            panic!("Attempt to exit the global scope");
+    fn new(parent: Environment) -> Self {
+        Environment {
+            variables: HashMap::new(),
+            parent: Some(Box::new(parent)),
         }
     }
 
     fn get(&self, name: &str) -> Option<&Value> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(val) = scope.get(name) {
-                return Some(val);
-            }
+        if let Some(val) = self.variables.get(name) {
+            return Some(val);
         }
-        None
+
+        match &self.parent {
+            Some(parent) => parent.get(name),
+            None => None,
+        }
     }
 
     // returns true if successful, and false if variable is not defined
     fn assign(&mut self, name: &str, val: Value) -> bool {
-        for scope in self.scopes.iter_mut().rev() {
-            if scope.contains_key(name) {
-                scope.insert(name.to_string(), val);
-                return true;
-            }
+        if self.variables.contains_key(name) {
+            self.variables.insert(name.to_string(), val);
+            return true;
         }
-        false
+
+        match &mut self.parent {
+            Some(parent) => parent.assign(name, val),
+            None => false,
+        }
     }
 
     fn define(&mut self, name: &str, val: Value) {
-        for scope in self.scopes.iter_mut().rev() {
-            scope.insert(name.to_string(), val);
-            return;
-        }
+        self.variables.insert(name.to_string(), val);
     }
 
     // fn is_defined(&self, name: &str) -> bool {
-    //     for scope in self.scopes.iter().rev() {
-    //         if scope.contains_key(name) {
-    //             return true;
-    //         }
+    //     if self.variables.contains_key(name) {
+    //         return true;
     //     }
-    //     false
+
+    //     match &self.parent {
+    //         Some(parent) => parent.is_defined(name),
+    //         None => false,
+    //     }
     // }
 }
