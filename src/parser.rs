@@ -55,6 +55,10 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_declaration(&mut self) -> Result<Stmt, Error<'a>> {
+        if let Some(stmt) = self.parse_test_comments() {
+            return Ok(stmt);
+        }
+
         // var <name> (= <expr>)? ;
         if self.matches(TokenKind::Var).is_some() {
             return Ok(self.parse_var_decl()?);
@@ -85,10 +89,11 @@ impl<'a> Parser<'a> {
 
     fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error<'a>> {
         let name = self.consume_identifier(format!("Expect {} name.", kind))?;
-        self.consume(
+        let lparen = self.consume(
             TokenKind::LeftParen,
             format!("Expect '(' after {} name.", kind),
         )?;
+        let line = lparen.span.line; // use line number of opening parenthesis
 
         let mut params: Vec<String> = vec![];
         if !self.check(TokenKind::RightParen) {
@@ -112,33 +117,12 @@ impl<'a> Parser<'a> {
 
         let body = self.parse_block()?;
 
-        return Ok(Stmt::Function(name.to_string(), params, body));
+        return Ok(Stmt::Function(name.to_string(), params, body, line));
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, Error<'a>> {
-        // == TEST ==
-        // expect: <output value>
-        // expect runtime error: <error message>
-        // Error <parser error>
-        while let Some(tok) = self.matches_p(|t| {
-            matches!(
-                t,
-                TokenKind::ExpectOutput(_)
-                    | TokenKind::ExpectParserError(_)
-                    | TokenKind::ExpectRuntimeError(_)
-            )
-        }) {
-            match tok.kind {
-                TokenKind::ExpectOutput(txt) => return Ok(Stmt::ExpectOutput(txt.to_string())),
-                TokenKind::ExpectRuntimeError(msg) => {
-                    return Ok(Stmt::ExpectRuntimeError(msg.to_string()))
-                }
-                TokenKind::ExpectParserError(_msg) => {
-                    // ignore this while parsing...
-                    continue;
-                }
-                _ => unreachable!(),
-            }
+        if let Some(stmt) = self.parse_test_comments() {
+            return Ok(stmt);
         }
 
         // if (<cond>) <then> ( else <else> )?
@@ -262,6 +246,34 @@ impl<'a> Parser<'a> {
             stmts.push(stmt);
         }
         return Err(self.parser_error("Expect '}' after block."));
+    }
+
+    fn parse_test_comments(&mut self) -> Option<Stmt> {
+        // == TEST ==
+        // expect: <output value>
+        // expect runtime error: <error message>
+        // Error <parser error>
+        while let Some(tok) = self.matches_p(|t| {
+            matches!(
+                t,
+                TokenKind::ExpectOutput(_)
+                    | TokenKind::ExpectParserError(_)
+                    | TokenKind::ExpectRuntimeError(_)
+            )
+        }) {
+            match tok.kind {
+                TokenKind::ExpectOutput(txt) => return Some(Stmt::ExpectOutput(txt.to_string())),
+                TokenKind::ExpectRuntimeError(msg) => {
+                    return Some(Stmt::ExpectRuntimeError(msg.to_string()))
+                }
+                TokenKind::ExpectParserError(_msg) => {
+                    // ignore this while parsing...
+                    continue;
+                }
+                _ => unreachable!(),
+            }
+        }
+        None
     }
 
     //

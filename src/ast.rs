@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 pub type Program = Vec<Stmt>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expr(Box<Expr>),
     Print(Box<Expr>),
@@ -10,13 +10,13 @@ pub enum Stmt {
     Block(Vec<Stmt>),
     IfElse(Box<Expr>, Box<Stmt>, Option<Box<Stmt>>),
     While(Box<Expr>, Box<Stmt>),
-    Function(String, Vec<String>, Vec<Stmt>),
+    Function(String, Vec<String>, Vec<Stmt>, usize),
 
     ExpectOutput(String),
     ExpectRuntimeError(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal(Literal),
     UnaryExpr {
@@ -41,7 +41,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Nil,
     True,
@@ -50,7 +50,7 @@ pub enum Literal {
     String(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     Not,
     Neg,

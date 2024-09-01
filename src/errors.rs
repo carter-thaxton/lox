@@ -120,13 +120,6 @@ impl<'a> Error<'a> {
         }
     }
 
-    pub fn runtime_error(message: impl Into<String>) -> Self {
-        Error {
-            kind: ErrorKind::RuntimeError(message.into()),
-            span: None,
-        }
-    }
-
     pub fn test_expected_parser_error(message: impl Into<String>) -> Self {
         Error {
             kind: ErrorKind::TestExpectedParserError(message.into()),
@@ -184,6 +177,22 @@ impl<'a> Error<'a> {
             " at end".into()
         } else {
             format!(" at '{}'", span.lexeme).into()
+        }
+    }
+}
+
+impl Error<'static> {
+    pub fn runtime_error(message: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::RuntimeError(message.into()),
+            span: None,
+        }
+    }
+
+    pub fn runtime_error_on_line(message: impl Into<String>, line: usize) -> Self {
+        Error {
+            kind: ErrorKind::RuntimeError(message.into()),
+            span: Some(Span::dummy_for_line(line)),
         }
     }
 }

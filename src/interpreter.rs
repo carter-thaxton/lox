@@ -2,7 +2,118 @@ use crate::ast::*;
 use crate::errors::*;
 use colored::Colorize;
 use std::collections::{HashMap, VecDeque};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
+use std::rc::Rc;
+use std::time::Instant;
+
+pub enum Callable {
+    Function {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+        line: usize,
+    },
+    Builtin {
+        name: String,
+        arity: usize,
+        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error<'static>>>,
+    },
+}
+
+// all this, because we can't derive PartialEq for builtin functions
+impl PartialEq for Callable {
+    fn eq(&self, other: &Callable) -> bool {
+        match (self, other) {
+            (
+                Callable::Function {
+                    name: my_name,
+                    params: my_params,
+                    body: my_body,
+                    line: my_line,
+                },
+                Callable::Function {
+                    name,
+                    params,
+                    body,
+                    line,
+                },
+            ) => my_name == name && my_params == params && my_body == body && my_line == line,
+            (
+                Callable::Builtin {
+                    name: my_name,
+                    arity: my_arity,
+                    ..
+                },
+                Callable::Builtin { name, arity, .. },
+            ) => {
+                // match builtins only by name and arity
+                my_name == name && my_arity == arity
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Debug for Callable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Callable::Function {
+                name,
+                params,
+                body: _,
+                line: _,
+            } => {
+                write!(f, "function {}(", name)?;
+                let mut first = true;
+                for param in params {
+                    if !first {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", param)?;
+                    first = false;
+                }
+                write!(f, ")")?;
+            }
+            Callable::Builtin {
+                name,
+                arity,
+                fcn: _,
+            } => {
+                write!(f, "builtin function {}(", name)?;
+                for i in 0..*arity {
+                    if i != 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "_")?;
+                }
+                write!(f, ")")?;
+            }
+        }
+        todo!()
+    }
+}
+
+impl Display for Callable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Callable::Function { name, .. } => {
+                write!(f, "<fn {}>", name)
+            }
+            Callable::Builtin { .. } => {
+                write!(f, "<native fn>")
+            }
+        }
+    }
+}
+
+impl Callable {
+    pub fn arity(&self) -> usize {
+        match self {
+            Callable::Function { params, .. } => params.len(),
+            Callable::Builtin { arity, .. } => *arity,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -11,6 +122,7 @@ pub enum Value {
     False,
     Number(f64),
     String(String),
+    Callable(Rc<Callable>),
 }
 
 impl Display for Value {
@@ -31,6 +143,9 @@ impl Display for Value {
             }
             Value::String(s) => {
                 write!(f, "{}", s)
+            }
+            Value::Callable(c) => {
+                write!(f, "{}", c)
             }
         }
     }
@@ -72,6 +187,25 @@ impl Value {
             _ => false,
         }
     }
+
+    pub fn is_callable(&self) -> bool {
+        match self {
+            Value::Callable(_) => true,
+            _ => false,
+        }
+    }
+
+    fn builtin_fn(
+        name: impl Into<String>,
+        arity: usize,
+        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error<'static>>>,
+    ) -> Value {
+        Value::Callable(Rc::new(Callable::Builtin {
+            name: name.into(),
+            arity,
+            fcn,
+        }))
+    }
 }
 
 fn compare_values(left: &Value, right: &Value) -> bool {
@@ -85,6 +219,10 @@ fn compare_values(left: &Value, right: &Value) -> bool {
     }
 }
 
+fn clock(start_time: &Instant) -> f64 {
+    Instant::now().duration_since(*start_time).as_secs_f64()
+}
+
 pub struct Interpreter {
     env: Environment,
     test: bool,
@@ -96,7 +234,14 @@ impl Interpreter {
         let mut env = Environment::new();
 
         // built-in globals
-        env.define("clock", Value::Nil); // TODO: implement built-in functions
+        let start_time = Instant::now();
+        let clock_fn = Value::builtin_fn(
+            "clock",
+            0,
+            Box::new(move |_| Ok(Value::Number(clock(&start_time)))),
+        );
+
+        env.define("clock", clock_fn);
 
         Interpreter {
             env,
@@ -105,7 +250,7 @@ impl Interpreter {
         }
     }
 
-    pub fn run<'a>(&mut self, program: &'a Program) -> Result<(), Error<'a>> {
+    pub fn run(&mut self, program: &Program) -> Result<(), Error<'static>> {
         for stmt in program {
             self.execute(stmt)?;
         }
@@ -118,7 +263,7 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn evaluate<'a>(&mut self, expr: &'a Expr) -> Result<Value, Error<'a>> {
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<Value, Error<'static>> {
         match expr {
             Expr::Literal(literal) => Ok(literal.into()),
 
@@ -300,19 +445,47 @@ impl Interpreter {
                 line: _,
             } => {
                 let callee = self.evaluate(callee)?;
-                let args: Result<Vec<Value>, Error<'a>> =
+                let args: Result<Vec<Value>, Error<'static>> =
                     args.into_iter().map(|arg| self.evaluate(arg)).collect();
                 let args = args?;
-
-                let _ = (callee, args);
-                todo!("Implement call");
+                return self.call(callee, &args);
             }
 
             _ => Err(Error::runtime_error("Unexpected expression.")),
         }
     }
 
-    fn evaluate_to_number<'a>(&mut self, expr: &'a Expr) -> Result<f64, Error<'a>> {
+    pub fn call(&mut self, callee: Value, args: &[Value]) -> Result<Value, Error<'static>> {
+        let callee = match callee {
+            Value::Callable(callee) => callee,
+            _ => return Err(Error::runtime_error("Can only call functions and classes.")),
+        };
+
+        if args.len() != callee.arity() {
+            return Err(Error::runtime_error(format!(
+                "Expected {} arguments but got {}.",
+                callee.arity(),
+                args.len()
+            )));
+        }
+
+        match &*callee {
+            Callable::Function { params, body, .. } => {
+                self.env.enter();
+                for (i, param) in params.iter().enumerate() {
+                    self.env.define(param, args[i].clone());
+                }
+                for stmt in body {
+                    self.execute(&stmt)?;
+                }
+                self.env.exit();
+                Ok(Value::Nil) // TODO: implement return value
+            }
+            Callable::Builtin { fcn, .. } => Ok(fcn(args)?),
+        }
+    }
+
+    fn evaluate_to_number(&mut self, expr: &Expr) -> Result<f64, Error<'static>> {
         let val = self.evaluate(expr)?;
         match val {
             Value::Number(n) => Ok(n),
@@ -320,11 +493,11 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_to_numbers<'a>(
+    fn evaluate_to_numbers(
         &mut self,
-        left: &'a Expr,
-        right: &'a Expr,
-    ) -> Result<(f64, f64), Error<'a>> {
+        left: &Expr,
+        right: &Expr,
+    ) -> Result<(f64, f64), Error<'static>> {
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
         match (left, right) {
@@ -333,7 +506,7 @@ impl Interpreter {
         }
     }
 
-    fn execute<'a>(&mut self, stmt: &'a Stmt) -> Result<(), Error<'a>> {
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), Error<'static>> {
         match stmt {
             Stmt::Expr(expr) => {
                 self.evaluate(expr)?;
@@ -376,8 +549,15 @@ impl Interpreter {
                 }
             }
 
-            Stmt::Function(_name, _args, _body) => {
-                todo!("Implement defintion of function");
+            Stmt::Function(name, params, body, line) => {
+                let fcn = Value::Callable(Rc::new(Callable::Function {
+                    name: name.to_string(),
+                    params: params.to_vec(),
+                    body: body.to_vec(),
+                    line: *line,
+                }));
+
+                self.env.define(name, fcn);
             }
 
             // == TEST ==
@@ -410,7 +590,7 @@ impl Interpreter {
     }
 
     // == TEST ==
-    fn check_output<'a>(&mut self, expected: &'a str) -> Result<(), Error<'a>> {
+    fn check_output(&mut self, expected: &str) -> Result<(), Error<'static>> {
         if let Some(actual) = self.test_output.pop_front() {
             if actual == expected {
                 println!("{}: expect: {}", "PASS".green(), actual);
@@ -423,7 +603,7 @@ impl Interpreter {
         }
     }
 
-    fn check_final_output<'a>(&mut self) -> Result<(), Error<'a>> {
+    fn check_final_output(&mut self) -> Result<(), Error<'static>> {
         if let Some(actual) = self.test_output.pop_front() {
             return Err(Error::test_output_unexpected(actual));
         }
@@ -431,7 +611,7 @@ impl Interpreter {
     }
 }
 
-struct Environment {
+pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
 }
 
