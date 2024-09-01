@@ -71,7 +71,9 @@ impl<'a> Parser<'a> {
         }
 
         // fun <name> ( (<arg>, )* ) { <body> }
-        if self.matches(TokenKind::Fun).is_some() {
+        // explicitly look ahead two tokens, for 'fun <name>', to allow for anonymous 'fun' expressions
+        if self.check2_p(|t1, t2| *t1 == TokenKind::Fun && matches!(t2, TokenKind::Identifier(_))) {
+            self.advance();  // skip over 'fun'
             return Ok(self.parse_fun_decl(FunctionKind::Function)?);
         }
 
@@ -770,4 +772,34 @@ impl<'a> Parser<'a> {
             Err(self.parser_error(message))
         }
     }
+
+    // lookahead 2 tokens
+
+    // fn check2(&mut self, token1: TokenKind<'a>, token2: TokenKind<'a>) -> bool {
+    //     let mut dup = self.lexer.clone();
+    //     if let Some(Ok(tok1)) = dup.next() {
+    //         if let Some(Ok(tok2)) = dup.peek() {
+    //             if tok1.kind == token1 && tok2.kind == token2 {
+    //                 return true;
+    //             }
+    //         }
+    //     }
+    //     false
+    // }
+
+    fn check2_p<P>(&mut self, pred: P) -> bool
+    where
+        P: FnOnce(&TokenKind<'_>, &TokenKind<'_>) -> bool,
+    {
+        let mut dup = self.lexer.clone();
+        if let Some(Ok(tok1)) = dup.next() {
+            if let Some(Ok(tok2)) = dup.peek() {
+                if pred(&tok1.kind, &tok2.kind) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
 }
