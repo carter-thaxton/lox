@@ -224,7 +224,6 @@ fn clock(start_time: &Instant) -> f64 {
 }
 
 pub struct Interpreter {
-    global_env: Environment,
     env: Option<Environment>,
     test: bool,
     test_output: VecDeque<String>,
@@ -245,7 +244,6 @@ impl Interpreter {
         env.define("clock", clock_fn);
 
         Interpreter {
-            global_env: env.clone(),
             env: Some(env),
             test,
             test_output: VecDeque::new(),
@@ -473,8 +471,7 @@ impl Interpreter {
 
         match &*callee {
             Callable::Function { params, body, .. } => {
-                let orig_env = self.env.take().unwrap();
-                self.env = Some(Environment::new(self.global_env.clone()));
+                self.enter();
 
                 for (i, param) in params.iter().enumerate() {
                     self.env().define(param, args[i].clone());
@@ -484,7 +481,7 @@ impl Interpreter {
                     self.execute(&stmt)?;
                 }
 
-                self.env = Some(orig_env);
+                self.exit();
 
                 Ok(Value::Nil) // TODO: implement return value
             }
