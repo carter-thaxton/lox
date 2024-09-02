@@ -69,21 +69,22 @@ impl<'a> Parser<'a> {
         }
 
         // var <name> (= <expr>)? ;
-        if self.matches(TokenKind::Var).is_some() {
-            return Ok(self.parse_var_decl()?);
+        if self.check(TokenKind::Var) {
+            return self.parse_var_decl();
         }
 
         // fun <name> ( (<arg>, )* ) { <body> }
         // explicitly look ahead two tokens, for 'fun <name>', to allow for anonymous 'fun' expressions
         if self.check2_p(|t1, t2| *t1 == TokenKind::Fun && matches!(t2, TokenKind::Identifier(_))) {
-            self.advance(); // skip over 'fun'
-            return Ok(self.parse_fun_decl(FunctionKind::Function)?);
+            return self.parse_fun_decl(FunctionKind::Function);
         }
 
         self.parse_stmt(in_function, in_loop)
     }
 
     fn parse_var_decl(&mut self) -> Result<Stmt, Error<'a>> {
+        self.consume(TokenKind::Var, "Expect 'var' to begin variable declaration.")?;
+
         let name = self
             .consume_identifier("Expect variable name.")?
             .to_string();
@@ -102,6 +103,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error<'a>> {
+        self.consume(TokenKind::Fun, "Expect 'fun' to begin function declaration.")?;
+
         let name = self.consume_identifier(format!("Expect {} name.", kind))?;
         let lparen = self.consume(
             TokenKind::LeftParen,
@@ -193,7 +196,7 @@ impl<'a> Parser<'a> {
 
             let init = if self.matches(TokenKind::Semicolon).is_some() {
                 None
-            } else if self.matches(TokenKind::Var).is_some() {
+            } else if self.check(TokenKind::Var) {
                 Some(self.parse_var_decl()?)
             } else {
                 Some(self.parse_expr_stmt()?)
@@ -618,8 +621,50 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Group(Box::new(expr)));
         }
 
+        // fun ( (<arg>, )* ) { <body> }
+        if self.matches(TokenKind::Fun).is_some() {
+            return self.parse_fun_expr();
+        }
+
         self.matches_err()?;
         Err(self.parser_error("Expect expression."))
+    }
+
+    // fun ( (<arg>, )* ) { <body> }
+    fn parse_fun_expr(&mut self) -> Result<Expr, Error<'a>> {
+        let lparen = self.consume(
+            TokenKind::LeftParen,
+            format!("Expect '(' after fun."),
+        )?;
+        let line = lparen.span.line; // use line number of opening parenthesis
+
+        let mut params: Vec<String> = vec![];
+        if !self.check(TokenKind::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(self.parser_error("Can't have more than 255 parameters."));
+                }
+                let param = self.consume_identifier("Expect parameter name.")?;
+                params.push(param.to_string());
+                if !self.matches(TokenKind::Comma).is_some() {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenKind::RightParen, "Expect ')' after parameters.")?;
+        self.consume(
+            TokenKind::LeftBrace,
+            format!("Expect '{{' before function body."),
+        )?;
+
+        let body = self.parse_block(true, None)?;
+
+        return Ok(Expr::Function {
+            params,
+            body,
+            line,
+        });
     }
 
     //

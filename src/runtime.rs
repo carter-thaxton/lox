@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 pub enum Callable {
     Function {
-        name: String,
+        name: Option<String>,
         params: Vec<String>,
         body: Vec<Stmt>,
         line: usize,
@@ -60,7 +60,11 @@ impl Debug for Callable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Callable::Function { name, params, .. } => {
-                write!(f, "function {}(", name)?;
+                if let Some(name) = name {
+                    write!(f, "function {}(", name)?;
+                } else {
+                    write!(f, "function (")?;
+                }
                 let mut first = true;
                 for param in params {
                     if !first {
@@ -89,8 +93,11 @@ impl Debug for Callable {
 impl Display for Callable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Callable::Function { name, .. } => {
+            Callable::Function { name: Some(name), .. } => {
                 write!(f, "<fn {}>", name)
+            }
+            Callable::Function { name: None, .. } => {
+                write!(f, "<anonymous fn>")
             }
             Callable::Builtin { .. } => {
                 write!(f, "<native fn>")

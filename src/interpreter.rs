@@ -230,13 +230,28 @@ impl Interpreter {
             Expr::Call {
                 callee,
                 args,
-                line: _,
+                ..
             } => {
                 let callee = self.evaluate(callee)?;
                 let args: Result<Vec<Value>, Error<'static>> =
                     args.into_iter().map(|arg| self.evaluate(arg)).collect();
                 let args = args?;
                 return self.call(callee, &args);
+            }
+
+            Expr::Function {
+                params,
+                body,
+                line,
+            } => {
+                let fcn = Value::Callable(Rc::new(Callable::Function {
+                    name: None,
+                    params: params.to_vec(),
+                    body: body.to_vec(),
+                    line: *line,
+                    closure: Rc::clone(&self.env),
+                }));
+                return Ok(fcn);
             }
 
             _ => Err(Error::runtime_error("Unexpected expression.")),
@@ -394,7 +409,7 @@ impl Interpreter {
                 line,
             } => {
                 let fcn = Value::Callable(Rc::new(Callable::Function {
-                    name: name.to_string(),
+                    name: Some(name.to_string()),
                     params: params.to_vec(),
                     body: body.to_vec(),
                     line: *line,
