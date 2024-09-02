@@ -9,6 +9,7 @@ pub enum Stmt {
     Var {
         name: String,
         init: Option<Expr>,
+        line: usize,
     },
     Block(Vec<Stmt>),
     IfElse {
@@ -49,12 +50,14 @@ pub enum Expr {
     Group(Box<Expr>), // parentheses - needed only to print out expected format
     Variable {
         name: String,
+        line: usize,
         depth: Option<usize>,
-        // index: Option<usize>,
     },
     Assign {
         name: String,
         right: Box<Expr>,
+        line: usize,
+        depth: Option<usize>,
     },
     Call {
         callee: Box<Expr>,
@@ -103,7 +106,7 @@ impl Display for Expr {
             Expr::UnaryExpr { op, right } => write!(f, "({} {})", op, right),
             Expr::BinaryExpr { op, left, right } => write!(f, "({} {} {})", op, left, right),
             Expr::Variable { name, .. } => write!(f, "(var {})", name),
-            Expr::Assign { name, right } => write!(f, "({} = {})", name, right),
+            Expr::Assign { name, right, .. } => write!(f, "({} = {})", name, right),
             Expr::Call { callee, args, .. } => {
                 // (call <callee> (<arg1>, .. <argN>))
                 write!(f, "(call {} (", callee)?;

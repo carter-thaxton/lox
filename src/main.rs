@@ -9,6 +9,7 @@ pub mod errors;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod resolver;
 pub mod runtime;
 
 use interpreter::Interpreter;
@@ -159,6 +160,17 @@ fn test(input: &str) {
 
     match result {
         Ok(program) => {
+            if !expected_parser_errors.is_empty() {
+                // no parser error, but one was expected
+                let expected = &expected_parser_errors[0];
+                println!(
+                    "{}: Expected parser error: {}",
+                    "FAIL".red(),
+                    expected
+                );
+                std::process::exit(EX_CONFIG);
+            }
+
             let mut int = Interpreter::new(true);
             let result = int.run(&program);
             if let Err(err) = result {

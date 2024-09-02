@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::errors::*;
 use crate::lexer::*;
+use crate::resolver::resolve;
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 
@@ -43,10 +44,14 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Result<Program, Error<'a>> {
         let mut program = Vec::new();
 
+        // first pass - parse
         while !self.at_eof() {
             let stmt = self.parse_declaration(false, None)?;
             program.push(stmt);
         }
+
+        // second pass - resolve declarations
+        resolve(&mut program)?;
 
         Ok(program)
     }
@@ -83,7 +88,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var_decl(&mut self) -> Result<Stmt, Error<'a>> {
-        self.consume(
+        let tok = self.consume(
             TokenKind::Var,
             "Expect 'var' to begin variable declaration.",
         )?;
@@ -92,16 +97,17 @@ impl<'a> Parser<'a> {
             .consume_identifier("Expect variable name.")?
             .to_string();
 
-        if self.matches(TokenKind::Equal).is_some() {
+        if let Some(tok) = self.matches(TokenKind::Equal) {
             let expr = self.parse_expr()?;
             self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
             return Ok(Stmt::Var {
                 name,
                 init: Some(expr),
+                line: tok.span.line,
             });
         } else {
             self.consume(TokenKind::Semicolon, "Expect ';' after var.")?;
-            return Ok(Stmt::Var { name, init: None });
+            return Ok(Stmt::Var { name, init: None, line: tok.span.line });
         }
     }
 
@@ -337,6 +343,9 @@ impl<'a> Parser<'a> {
     ) -> Result<Vec<Stmt>, Error<'a>> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
+            if let Some(stmt) = self.parse_test_comments() {
+                stmts.push(stmt);
+            }
             if self.matches(TokenKind::RightBrace).is_some() {
                 return Ok(stmts);
             }
@@ -393,6 +402,8 @@ impl<'a> Parser<'a> {
                 return Ok(Expr::Assign {
                     name,
                     right: Box::new(right),
+                    line: tok.span.line,
+                    depth: None,
                 });
             } else {
                 // return error referring to '='
@@ -618,8 +629,12 @@ impl<'a> Parser<'a> {
         }
 
         // <identifier>
-        if let Some(name) = self.matches_identifier() {
-            return Ok(Expr::Variable { name: name.to_string(), depth: None });
+        if let Some((name, tok)) = self.matches_identifier() {
+            return Ok(Expr::Variable {
+                name: name.to_string(),
+                depth: None,
+                line: tok.span.line,
+            });
         }
 
         // ( <expr> )
@@ -751,12 +766,12 @@ impl<'a> Parser<'a> {
     }
 
     // create a parser error referring to the span of the next token, with the given message to match the book
-    // at EOF, constructs a dummy span using the last seen line number
+    // at EOF, uses the last seen line number
     fn parser_error(&mut self, message: impl Into<String>) -> Error<'a> {
         if let Some(span) = self.next_span() {
             Error::parser_error(span, message)
         } else {
-            Error::parser_error(Span::dummy_for_line(self.last_line), message)
+            Error::parser_error_on_line(self.last_line, message)
         }
     }
 
@@ -833,10 +848,11 @@ impl<'a> Parser<'a> {
         self.check_p(|kind| matches!(kind, TokenKind::Identifier(_)))
     }
 
-    fn matches_identifier(&mut self) -> Option<&'a str> {
+    fn matches_identifier(&mut self) -> Option<(&'a str, Token<'a>)> {
         if self.check_identifier() {
-            match self.advance().kind {
-                TokenKind::Identifier(name) => Some(name),
+            let tok = self.advance();
+            match tok.kind {
+                TokenKind::Identifier(name) => Some((name, tok)),
                 _ => unreachable!("Known to be identifier"),
             }
         } else {
@@ -845,7 +861,7 @@ impl<'a> Parser<'a> {
     }
 
     fn consume_identifier(&mut self, message: impl Into<String>) -> Result<&'a str, Error<'a>> {
-        if let Some(name) = self.matches_identifier() {
+        if let Some((name, _)) = self.matches_identifier() {
             Ok(name)
         } else {
             Err(self.parser_error(message))

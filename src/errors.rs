@@ -91,8 +91,10 @@ impl Display for ErrorKind {
             ErrorKind::TestOutputUnexpected(actual) => {
                 write!(f, "{}: Unexpected output: {}", "FAIL".red(), actual)
             }
+
+            // runtime control-flow
             ErrorKind::ReturnValue(value) => {
-                write!(f, "Return value: {}", value)
+                write!(f, "return: {}", value)
             }
             ErrorKind::BreakLoop => {
                 write!(f, "break")
@@ -131,6 +133,13 @@ impl<'a> Error<'a> {
         Error {
             kind: ErrorKind::ParserError(message.into()),
             span: Some(span),
+        }
+    }
+
+    pub fn parser_error_on_line(line: usize, message: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::ParserError(message.into()),
+            span: Some(Span::dummy_for_line(line)),
         }
     }
 

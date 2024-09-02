@@ -57,7 +57,7 @@ impl Interpreter {
 
             Expr::Group(expr) => self.evaluate(expr),
 
-            Expr::Variable { name, depth: _ } => {
+            Expr::Variable { name, .. } => {
                 // TODO: use depth/index to lookup variable in statically-resolved scope
                 if let Some(val) = self.env.borrow().get(name) {
                     Ok(val.clone())
@@ -216,7 +216,7 @@ impl Interpreter {
                 }
             }
 
-            Expr::Assign { name, right } => {
+            Expr::Assign { name, right, .. } => {
                 let right = self.evaluate(right)?;
                 if self.env.borrow_mut().assign(name, right.clone()) {
                     Ok(right)
@@ -337,7 +337,7 @@ impl Interpreter {
                 self.print(&val);
             }
 
-            Stmt::Var { name, init } => {
+            Stmt::Var { name, init, .. } => {
                 if let Some(expr) = init {
                     let val = self.evaluate(expr)?;
                     self.env.borrow_mut().define(name, val);
