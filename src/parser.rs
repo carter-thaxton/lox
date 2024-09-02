@@ -218,6 +218,8 @@ impl<'a> Parser<'a> {
 
             self.consume(TokenKind::RightParen, "Expect ')' after for clauses.")?;
 
+            // parse body, with an implied post-increment expression, which should be
+            // inserted before any 'continue' statements in the loop.
             let loop_context = LoopContext {
                 post_incr: incr.as_ref(),
             };
