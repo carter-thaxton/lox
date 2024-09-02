@@ -622,7 +622,7 @@ impl<'a> Parser<'a> {
         }
 
         // fun ( (<arg>, )* ) { <body> }
-        if self.matches(TokenKind::Fun).is_some() {
+        if self.check2(TokenKind::Fun, TokenKind::LeftParen) {
             return self.parse_fun_expr();
         }
 
@@ -632,6 +632,8 @@ impl<'a> Parser<'a> {
 
     // fun ( (<arg>, )* ) { <body> }
     fn parse_fun_expr(&mut self) -> Result<Expr, Error<'a>> {
+        self.consume(TokenKind::Fun, "Expect 'fun' to start anonymous function.")?;
+
         let lparen = self.consume(
             TokenKind::LeftParen,
             format!("Expect '(' after fun."),
@@ -851,17 +853,17 @@ impl<'a> Parser<'a> {
 
     // lookahead 2 tokens
 
-    // fn check2(&mut self, token1: TokenKind<'a>, token2: TokenKind<'a>) -> bool {
-    //     let mut dup = self.lexer.clone();
-    //     if let Some(Ok(tok1)) = dup.next() {
-    //         if let Some(Ok(tok2)) = dup.peek() {
-    //             if tok1.kind == token1 && tok2.kind == token2 {
-    //                 return true;
-    //             }
-    //         }
-    //     }
-    //     false
-    // }
+    fn check2(&mut self, token1: TokenKind<'a>, token2: TokenKind<'a>) -> bool {
+        let mut dup = self.lexer.clone();
+        if let Some(Ok(tok1)) = dup.next() {
+            if let Some(Ok(tok2)) = dup.peek() {
+                if tok1.kind == token1 && tok2.kind == token2 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 
     fn check2_p<P>(&mut self, pred: P) -> bool
     where
