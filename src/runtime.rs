@@ -16,7 +16,7 @@ pub enum Callable {
     Builtin {
         name: String,
         arity: usize,
-        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error<'static>>>,
+        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
     },
 }
 
@@ -193,7 +193,7 @@ impl Value {
     pub fn builtin_fn(
         name: impl Into<String>,
         arity: usize,
-        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error<'static>>>,
+        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
     ) -> Value {
         Value::Callable(Rc::new(Callable::Builtin {
             name: name.into(),

@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
         self.lexer.peek().is_none()
     }
 
-    pub fn parse(&mut self) -> Result<Program, Error<'a>> {
+    pub fn parse(&mut self) -> Result<Program, Error> {
         let mut program = Vec::new();
 
         // first pass - parse
@@ -68,7 +68,7 @@ impl<'a> Parser<'a> {
         &mut self,
         in_function: bool,
         in_loop: Option<LoopContext>,
-    ) -> Result<Stmt, Error<'a>> {
+    ) -> Result<Stmt, Error> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -87,7 +87,7 @@ impl<'a> Parser<'a> {
         self.parse_stmt(in_function, in_loop)
     }
 
-    fn parse_var_decl(&mut self) -> Result<Stmt, Error<'a>> {
+    fn parse_var_decl(&mut self) -> Result<Stmt, Error> {
         let tok = self.consume(
             TokenKind::Var,
             "Expect 'var' to begin variable declaration.",
@@ -111,7 +111,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error<'a>> {
+    fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error> {
         self.consume(
             TokenKind::Fun,
             "Expect 'fun' to begin function declaration.",
@@ -158,7 +158,7 @@ impl<'a> Parser<'a> {
         &mut self,
         in_function: bool,
         in_loop: Option<LoopContext>,
-    ) -> Result<Stmt, Error<'a>> {
+    ) -> Result<Stmt, Error> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -330,7 +330,7 @@ impl<'a> Parser<'a> {
         self.parse_expr_stmt()
     }
 
-    fn parse_expr_stmt(&mut self) -> Result<Stmt, Error<'a>> {
+    fn parse_expr_stmt(&mut self) -> Result<Stmt, Error> {
         let expr = self.parse_expr()?;
         self.consume(TokenKind::Semicolon, "Expect ';' after expresssion.")?;
         Ok(Stmt::Expr(Box::new(expr)))
@@ -340,7 +340,7 @@ impl<'a> Parser<'a> {
         &mut self,
         in_function: bool,
         in_loop: Option<LoopContext>,
-    ) -> Result<Vec<Stmt>, Error<'a>> {
+    ) -> Result<Vec<Stmt>, Error> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
             if let Some(stmt) = self.parse_test_comments() {
@@ -387,11 +387,11 @@ impl<'a> Parser<'a> {
     // expressions
     //
 
-    pub fn parse_expr(&mut self) -> Result<Expr, Error<'a>> {
+    pub fn parse_expr(&mut self) -> Result<Expr, Error> {
         self.parse_assignment()
     }
 
-    fn parse_assignment(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_assignment(&mut self) -> Result<Expr, Error> {
         let left = self.parse_logical_or()?;
 
         // <left> = <right> ;
@@ -414,7 +414,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_logical_or(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_logical_or(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_logical_and()?;
 
         // <left> or <right>
@@ -430,7 +430,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_logical_and(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_logical_and(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_equality()?;
 
         // <left> and <right>
@@ -446,7 +446,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_equality(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_equality(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_comparison()?;
 
         // <left> == <right> | <left> != <right>
@@ -467,7 +467,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_comparison(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_comparison(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_term()?;
 
         // <left> < <right> | <left> <= <right> | <left> > <right> | <left> >= <right>
@@ -495,7 +495,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_term(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_term(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_factor()?;
 
         // <left> + <right> | <left> - <right>
@@ -516,7 +516,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_factor(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_factor(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_unary()?;
 
         // <left> * <right> | <left> / <right>
@@ -537,7 +537,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_unary(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_unary(&mut self) -> Result<Expr, Error> {
         // - <right>
         if self.matches(TokenKind::Minus).is_some() {
             let right = self.parse_unary()?;
@@ -559,7 +559,7 @@ impl<'a> Parser<'a> {
         self.parse_call()
     }
 
-    fn parse_call(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_call(&mut self) -> Result<Expr, Error> {
         let mut left = self.parse_primary()?;
 
         loop {
@@ -594,7 +594,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_primary(&mut self) -> Result<Expr, Error> {
         // nil
         if self.matches(TokenKind::Nil).is_some() {
             return Ok(Expr::Literal(Literal::Nil));
@@ -654,7 +654,7 @@ impl<'a> Parser<'a> {
     }
 
     // fun ( (<arg>, )* ) { <body> }
-    fn parse_fun_expr(&mut self) -> Result<Expr, Error<'a>> {
+    fn parse_fun_expr(&mut self) -> Result<Expr, Error> {
         self.consume(TokenKind::Fun, "Expect 'fun' to start anonymous function.")?;
 
         let lparen = self.consume(TokenKind::LeftParen, format!("Expect '(' after fun."))?;
@@ -691,7 +691,7 @@ impl<'a> Parser<'a> {
 
     // peek ahead without advancing
     // returns None at EOF, an Err if a lexing error occurs, and the next TokenKind otherwise
-    fn peek(&mut self) -> Option<Result<&TokenKind<'a>, &Error<'a>>> {
+    fn peek(&mut self) -> Option<Result<&TokenKind<'a>, &Error>> {
         match self.lexer.peek() {
             Some(Ok(token)) => Some(Ok(&token.kind)),
             Some(Err(err)) => Some(Err(err)),
@@ -701,14 +701,14 @@ impl<'a> Parser<'a> {
 
     // advance ahead to next token, skipping over any test comments, useful for reporting parser errors
     // returns None at EOF
-    fn next_span(&mut self) -> Option<Span<'a>> {
+    fn next_span_for_error(&mut self) -> Option<ErrorSpan> {
         loop {
             match self.lexer.next() {
                 Some(Ok(token)) if token.kind.is_test() => {
                     continue;
                 }
                 Some(Ok(token)) if !token.kind.is_test() => {
-                    return Some(token.span);
+                    return Some(token.span.into());
                 }
                 Some(Err(Error {
                     span: Some(span), ..
@@ -758,7 +758,7 @@ impl<'a> Parser<'a> {
 
     // check to see if next token is a lexer error, and advances if so
     // does nothing at EOF or when next token is not an error
-    fn matches_err(&mut self) -> Result<(), Error<'a>> {
+    fn matches_err(&mut self) -> Result<(), Error> {
         match self.lexer.peek() {
             Some(Err(_)) => Err(self.lexer.next().unwrap().unwrap_err()),
             _ => Ok(()),
@@ -767,8 +767,8 @@ impl<'a> Parser<'a> {
 
     // create a parser error referring to the span of the next token, with the given message to match the book
     // at EOF, uses the last seen line number
-    fn parser_error(&mut self, message: impl Into<String>) -> Error<'a> {
-        if let Some(span) = self.next_span() {
+    fn parser_error(&mut self, message: impl Into<String>) -> Error {
+        if let Some(span) = self.next_span_for_error() {
             Error::parser_error(span, message)
         } else {
             Error::parser_error_on_line(self.last_line, message)
@@ -780,7 +780,7 @@ impl<'a> Parser<'a> {
         &mut self,
         token: TokenKind<'a>,
         message: impl Into<String>,
-    ) -> Result<Token<'a>, Error<'a>> {
+    ) -> Result<Token<'a>, Error> {
         if self.check(token) {
             Ok(self.advance())
         } else {
@@ -860,7 +860,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn consume_identifier(&mut self, message: impl Into<String>) -> Result<&'a str, Error<'a>> {
+    fn consume_identifier(&mut self, message: impl Into<String>) -> Result<&'a str, Error> {
         if let Some((name, _)) = self.matches_identifier() {
             Ok(name)
         } else {

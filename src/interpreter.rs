@@ -38,7 +38,7 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, program: &Program) -> Result<(), Error<'static>> {
+    pub fn run(&mut self, program: &Program) -> Result<(), Error> {
         for stmt in program {
             self.execute(stmt)?;
         }
@@ -51,7 +51,7 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn evaluate(&mut self, expr: &Expr) -> Result<Value, Error<'static>> {
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<Value, Error> {
         match expr {
             Expr::Literal(literal) => Ok(literal.into()),
 
@@ -230,7 +230,7 @@ impl Interpreter {
 
             Expr::Call { callee, args, .. } => {
                 let callee = self.evaluate(callee)?;
-                let args: Result<Vec<Value>, Error<'static>> =
+                let args: Result<Vec<Value>, Error> =
                     args.into_iter().map(|arg| self.evaluate(arg)).collect();
                 let args = args?;
                 return self.call(callee, &args);
@@ -251,7 +251,7 @@ impl Interpreter {
         }
     }
 
-    pub fn call(&mut self, callee: Value, args: &[Value]) -> Result<Value, Error<'static>> {
+    pub fn call(&mut self, callee: Value, args: &[Value]) -> Result<Value, Error> {
         let callee = match callee {
             Value::Callable(callee) => callee,
             _ => return Err(Error::runtime_error("Can only call functions and classes.")),
@@ -305,7 +305,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_to_number(&mut self, expr: &Expr) -> Result<f64, Error<'static>> {
+    fn evaluate_to_number(&mut self, expr: &Expr) -> Result<f64, Error> {
         let val = self.evaluate(expr)?;
         match val {
             Value::Number(n) => Ok(n),
@@ -317,7 +317,7 @@ impl Interpreter {
         &mut self,
         left: &Expr,
         right: &Expr,
-    ) -> Result<(f64, f64), Error<'static>> {
+    ) -> Result<(f64, f64), Error> {
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
         match (left, right) {
@@ -326,7 +326,7 @@ impl Interpreter {
         }
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> Result<(), Error<'static>> {
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), Error> {
         match stmt {
             Stmt::Expr(expr) => {
                 self.evaluate(expr)?;
@@ -466,7 +466,7 @@ impl Interpreter {
     }
 
     // == TEST ==
-    fn check_output(&mut self, expected: &str) -> Result<(), Error<'static>> {
+    fn check_output(&mut self, expected: &str) -> Result<(), Error> {
         if let Some(actual) = self.test_output.pop_front() {
             if actual == expected {
                 println!("{}: expect: {}", "PASS".green(), actual);
@@ -479,7 +479,7 @@ impl Interpreter {
         }
     }
 
-    fn check_final_output(&mut self) -> Result<(), Error<'static>> {
+    fn check_final_output(&mut self) -> Result<(), Error> {
         if let Some(actual) = self.test_output.pop_front() {
             return Err(Error::test_output_unexpected(actual));
         }

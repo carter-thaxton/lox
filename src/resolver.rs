@@ -1,5 +1,4 @@
 use crate::ast::*;
-//use crate::lexer::Span;
 use crate::errors::*;
 use std::collections::HashMap;
 
@@ -67,11 +66,8 @@ impl<'a> Scopes<'a> {
 // currently, the only mutation to the AST is to set the 'depth' on any Variable and Assign expressions.
 // TODO: do anonymous function expressions need any special treatment?
 //
-// 'p refers to the program AST
-// 'a refers to the source text, which errors may refer to
-//
-pub fn resolve<'p, 'a: 'p>(program: &'p mut Program) -> Result<(), Error<'a>> {
-    let mut scopes: Scopes<'p> = Scopes::new();
+pub fn resolve(program: &mut Program) -> Result<(), Error> {
+    let mut scopes = Scopes::new();
 
     for stmt in program {
         resolve_stmt(stmt, &mut scopes)?;
@@ -80,10 +76,10 @@ pub fn resolve<'p, 'a: 'p>(program: &'p mut Program) -> Result<(), Error<'a>> {
     Ok(())
 }
 
-fn resolve_stmt<'p, 'a: 'p>(
-    stmt: &'p mut Stmt,
-    scopes: &mut Scopes<'p>,
-) -> Result<(), Error<'a>> {
+fn resolve_stmt<'a>(
+    stmt: &'a mut Stmt,
+    scopes: &mut Scopes<'a>,
+) -> Result<(), Error> {
     match stmt {
         // these are the juicy cases
         Stmt::Function {
@@ -152,10 +148,10 @@ fn resolve_stmt<'p, 'a: 'p>(
     Ok(())
 }
 
-fn resolve_expr<'p, 'a: 'p>(
-    expr: &'p mut Expr,
-    scopes: &mut Scopes<'p>,
-) -> Result<(), Error<'a>> {
+fn resolve_expr<'a>(
+    expr: &'a mut Expr,
+    scopes: &mut Scopes<'a>,
+) -> Result<(), Error> {
     match expr {
         // these are the juicy cases
         Expr::Variable { name, line, depth } => {
@@ -209,11 +205,11 @@ fn resolve_expr<'p, 'a: 'p>(
     Ok(())
 }
 
-fn resolve_function<'p, 'a: 'p>(
-    params: &'p [String],
-    body: &'p mut [Stmt],
-    scopes: &mut Scopes<'p>,
-) -> Result<(), Error<'a>> {
+fn resolve_function<'a>(
+    params: &'a [String],
+    body: &'a mut [Stmt],
+    scopes: &mut Scopes<'a>,
+) -> Result<(), Error> {
 
     // be sure to pop this before exiting
     scopes.push();

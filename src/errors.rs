@@ -5,9 +5,36 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Error<'a> {
+pub struct Error {
     pub kind: ErrorKind,
-    pub span: Option<Span<'a>>,
+    pub span: Option<ErrorSpan>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ErrorSpan {
+    line: usize,
+    col: usize,
+    lexeme: Option<String>,
+}
+
+impl ErrorSpan {
+    fn dummy_for_line(line: usize) -> Self {
+        ErrorSpan {
+            line,
+            col: 0,
+            lexeme: None,
+        }
+    }
+}
+
+impl From<Span<'_>> for ErrorSpan {
+    fn from(span: Span<'_>) -> Self {
+        ErrorSpan {
+            line: span.line,
+            col: span.col,
+            lexeme: Some(span.lexeme.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,9 +56,9 @@ pub enum ErrorKind {
     TestOutputUnexpected(String),
 }
 
-impl Display for Error<'_> {
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        if let Some(span) = self.span {
+        if let Some(span) = &self.span {
             write!(
                 f,
                 "[line {}] Error{}: {}",
@@ -106,40 +133,40 @@ impl Display for ErrorKind {
     }
 }
 
-impl<'a> Error<'a> {
-    pub fn unexpected_character(span: Span<'a>) -> Self {
+impl Error {
+    pub fn unexpected_character(span: Span<'_>) -> Self {
         let ch = span.lexeme.chars().next().expect("Should not be at EOF");
         Error {
             kind: ErrorKind::UnexpectedCharacter(ch),
-            span: Some(span),
+            span: Some(span.into()),
         }
     }
 
-    pub fn unterminated_string(span: Span<'a>) -> Self {
+    pub fn unterminated_string(span: Span<'_>) -> Self {
         Error {
             kind: ErrorKind::UnterminatedString,
-            span: Some(span),
+            span: Some(span.into()),
         }
     }
 
-    pub fn invalid_number(span: Span<'a>) -> Self {
+    pub fn invalid_number(span: Span<'_>) -> Self {
         Error {
             kind: ErrorKind::InvalidNumber(span.lexeme.to_string()),
-            span: Some(span),
+            span: Some(span.into()),
         }
     }
 
-    pub fn parser_error(span: Span<'a>, message: impl Into<String>) -> Self {
+    pub fn parser_error(span: impl Into<ErrorSpan>, message: impl Into<String>) -> Self {
         Error {
             kind: ErrorKind::ParserError(message.into()),
-            span: Some(span),
+            span: Some(span.into()),
         }
     }
 
     pub fn parser_error_on_line(line: usize, message: impl Into<String>) -> Self {
         Error {
             kind: ErrorKind::ParserError(message.into()),
-            span: Some(Span::dummy_for_line(line)),
+            span: Some(ErrorSpan::dummy_for_line(line)),
         }
     }
 
@@ -188,23 +215,6 @@ impl<'a> Error<'a> {
         )
     }
 
-    fn at_message(&self) -> Cow<str> {
-        let span = match &self.kind {
-            ErrorKind::ParserError(_) => self.span.expect("ParserError should have a span"),
-            _ => {
-                return "".into();
-            }
-        };
-
-        if span.lexeme.is_empty() {
-            " at end".into()
-        } else {
-            format!(" at '{}'", span.lexeme).into()
-        }
-    }
-}
-
-impl Error<'static> {
     pub fn runtime_error(message: impl Into<String>) -> Self {
         Error {
             kind: ErrorKind::RuntimeError(message.into()),
@@ -215,7 +225,7 @@ impl Error<'static> {
     pub fn runtime_error_on_line(message: impl Into<String>, line: usize) -> Self {
         Error {
             kind: ErrorKind::RuntimeError(message.into()),
-            span: Some(Span::dummy_for_line(line)),
+            span: Some(ErrorSpan::dummy_for_line(line)),
         }
     }
 
@@ -237,6 +247,21 @@ impl Error<'static> {
         Error {
             kind: ErrorKind::ContinueLoop,
             span: None,
+        }
+    }
+
+    fn at_message(&self) -> Cow<str> {
+        let span: &ErrorSpan = match &self.kind {
+            ErrorKind::ParserError(_) => &self.span.as_ref().expect("ParserError should have a span"),
+            _ => {
+                return "".into();
+            }
+        };
+
+        if let Some(lexeme) = &span.lexeme {
+            format!(" at '{}'", lexeme).into()
+        } else {
+            " at end".into()
         }
     }
 }
