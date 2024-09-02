@@ -83,7 +83,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var_decl(&mut self) -> Result<Stmt, Error<'a>> {
-        self.consume(TokenKind::Var, "Expect 'var' to begin variable declaration.")?;
+        self.consume(
+            TokenKind::Var,
+            "Expect 'var' to begin variable declaration.",
+        )?;
 
         let name = self
             .consume_identifier("Expect variable name.")?
@@ -103,7 +106,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error<'a>> {
-        self.consume(TokenKind::Fun, "Expect 'fun' to begin function declaration.")?;
+        self.consume(
+            TokenKind::Fun,
+            "Expect 'fun' to begin function declaration.",
+        )?;
 
         let name = self.consume_identifier(format!("Expect {} name.", kind))?;
         let lparen = self.consume(
@@ -382,7 +388,7 @@ impl<'a> Parser<'a> {
         // <left> = <right> ;
         if let Some(tok) = self.matches(TokenKind::Equal) {
             // <left> must be an L-value
-            if let Expr::Variable(name) = left {
+            if let Expr::Variable { name, .. } = left {
                 let right = self.parse_assignment()?;
                 return Ok(Expr::Assign {
                     name,
@@ -613,7 +619,7 @@ impl<'a> Parser<'a> {
 
         // <identifier>
         if let Some(name) = self.matches_identifier() {
-            return Ok(Expr::Variable(name.to_string()));
+            return Ok(Expr::Variable { name: name.to_string(), depth: None });
         }
 
         // ( <expr> )
@@ -636,10 +642,7 @@ impl<'a> Parser<'a> {
     fn parse_fun_expr(&mut self) -> Result<Expr, Error<'a>> {
         self.consume(TokenKind::Fun, "Expect 'fun' to start anonymous function.")?;
 
-        let lparen = self.consume(
-            TokenKind::LeftParen,
-            format!("Expect '(' after fun."),
-        )?;
+        let lparen = self.consume(TokenKind::LeftParen, format!("Expect '(' after fun."))?;
         let line = lparen.span.line; // use line number of opening parenthesis
 
         let mut params: Vec<String> = vec![];
@@ -664,11 +667,7 @@ impl<'a> Parser<'a> {
 
         let body = self.parse_block(true, None)?;
 
-        return Ok(Expr::Function {
-            params,
-            body,
-            line,
-        });
+        return Ok(Expr::Function { params, body, line });
     }
 
     //

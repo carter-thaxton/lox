@@ -57,7 +57,8 @@ impl Interpreter {
 
             Expr::Group(expr) => self.evaluate(expr),
 
-            Expr::Variable(name) => {
+            Expr::Variable { name, depth: _ } => {
+                // TODO: use depth/index to lookup variable in statically-resolved scope
                 if let Some(val) = self.env.borrow().get(name) {
                     Ok(val.clone())
                 } else {
@@ -227,11 +228,7 @@ impl Interpreter {
                 }
             }
 
-            Expr::Call {
-                callee,
-                args,
-                ..
-            } => {
+            Expr::Call { callee, args, .. } => {
                 let callee = self.evaluate(callee)?;
                 let args: Result<Vec<Value>, Error<'static>> =
                     args.into_iter().map(|arg| self.evaluate(arg)).collect();
@@ -239,11 +236,7 @@ impl Interpreter {
                 return self.call(callee, &args);
             }
 
-            Expr::Function {
-                params,
-                body,
-                line,
-            } => {
+            Expr::Function { params, body, line } => {
                 let fcn = Value::Callable(Rc::new(Callable::Function {
                     name: None,
                     params: params.to_vec(),

@@ -47,7 +47,11 @@ pub enum Expr {
         right: Box<Expr>,
     },
     Group(Box<Expr>), // parentheses - needed only to print out expected format
-    Variable(String),
+    Variable {
+        name: String,
+        depth: Option<usize>,
+        // index: Option<usize>,
+    },
     Assign {
         name: String,
         right: Box<Expr>,
@@ -98,13 +102,9 @@ impl Display for Expr {
             Expr::Group(expr) => write!(f, "(group {})", expr),
             Expr::UnaryExpr { op, right } => write!(f, "({} {})", op, right),
             Expr::BinaryExpr { op, left, right } => write!(f, "({} {} {})", op, left, right),
-            Expr::Variable(name) => write!(f, "(var {})", name),
+            Expr::Variable { name, .. } => write!(f, "(var {})", name),
             Expr::Assign { name, right } => write!(f, "({} = {})", name, right),
-            Expr::Call {
-                callee,
-                args,
-                line: _,
-            } => {
+            Expr::Call { callee, args, .. } => {
                 // (call <callee> (<arg1>, .. <argN>))
                 write!(f, "(call {} (", callee)?;
                 let mut first = true;

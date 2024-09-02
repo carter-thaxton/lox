@@ -93,7 +93,9 @@ impl Debug for Callable {
 impl Display for Callable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Callable::Function { name: Some(name), .. } => {
+            Callable::Function {
+                name: Some(name), ..
+            } => {
                 write!(f, "<fn {}>", name)
             }
             Callable::Function { name: None, .. } => {
