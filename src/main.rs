@@ -6,6 +6,7 @@ use colored::Colorize;
 
 pub mod ast;
 pub mod errors;
+pub mod globals;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;

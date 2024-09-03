@@ -1,15 +1,11 @@
 use crate::ast::*;
 use crate::errors::*;
+use crate::globals::*;
 use crate::runtime::*;
 use colored::Colorize;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use std::time::Instant;
-
-fn clock(start_time: &Instant) -> f64 {
-    Instant::now().duration_since(*start_time).as_secs_f64()
-}
 
 pub struct Interpreter {
     env: Rc<RefCell<Environment>>,
@@ -21,15 +17,7 @@ impl Interpreter {
     pub fn new(test: bool) -> Self {
         let mut env = Environment::global();
 
-        // built-in globals
-        let start_time = Instant::now();
-        let clock_fn = Value::builtin_fn(
-            "clock",
-            0,
-            Box::new(move |_| Ok(Value::Number(clock(&start_time)))),
-        );
-
-        env.define("clock", clock_fn);
+        define_globals(&mut env);
 
         Interpreter {
             env: Rc::new(RefCell::new(env)),
@@ -57,10 +45,13 @@ impl Interpreter {
 
             Expr::Group(expr) => self.evaluate(expr),
 
-            Expr::Variable { name, .. } => {
-                // TODO: use depth/index to lookup variable in statically-resolved scope
-                if let Some(val) = self.env.borrow().get(name) {
-                    Ok(val.clone())
+            Expr::Variable { name, depth, .. } => {
+                if let Some(depth) = depth {
+                    if let Some(val) = self.env.borrow().get_at(name, *depth) {
+                        Ok(val.clone())
+                    } else {
+                        panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
+                    }
                 } else {
                     Err(Error::runtime_error(format!(
                         "Undefined variable '{}'.",
@@ -216,10 +207,14 @@ impl Interpreter {
                 }
             }
 
-            Expr::Assign { name, right, .. } => {
+            Expr::Assign { name, right, depth, .. } => {
                 let right = self.evaluate(right)?;
-                if self.env.borrow_mut().assign(name, right.clone()) {
-                    Ok(right)
+                if let Some(depth) = depth {
+                    if self.env.borrow_mut().assign_at(name, *depth, right.clone()) {
+                        Ok(right)
+                    } else {
+                        panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
+                    }
                 } else {
                     Err(Error::runtime_error(format!(
                         "Undefined variable '{}'.",
@@ -338,12 +333,12 @@ impl Interpreter {
             }
 
             Stmt::Var { name, init, .. } => {
-                if let Some(expr) = init {
-                    let val = self.evaluate(expr)?;
-                    self.env.borrow_mut().define(name, val);
+                let val = if let Some(expr) = init {
+                    self.evaluate(expr)?
                 } else {
-                    self.env.borrow_mut().define(name, Value::Nil);
-                }
+                    Value::Nil
+                };
+                self.env.borrow_mut().define(name, val);
             }
 
             Stmt::Block(stmts) => {

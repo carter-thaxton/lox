@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::errors::*;
+use crate::globals::*;
 use std::collections::HashMap;
 
 struct Scopes<'a>(Vec<HashMap<&'a str, bool>>);
@@ -72,6 +73,10 @@ impl<'a> Scopes<'a> {
 //
 pub fn resolve(program: &mut Program) -> Result<(), Error> {
     let mut scopes = Scopes::new();
+
+    for name in global_names() {
+        scopes.declare(name);
+    }
 
     for stmt in program {
         resolve_stmt(stmt, &mut scopes)?;

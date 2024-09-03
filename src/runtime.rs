@@ -246,6 +246,17 @@ impl Environment {
         }
     }
 
+    pub fn get_at(&self, name: &str, depth: usize) -> Option<Value> {
+        if depth == 0 {
+            self.variables.get(name).map(|val| val.clone())
+        } else {
+            match &self.parent {
+                Some(parent) => parent.borrow().get_at(name, depth-1),
+                None => None,
+            }
+        }
+    }
+
     // returns true if successful, and false if variable is not defined
     pub fn assign(&mut self, name: &str, val: Value) -> bool {
         if self.variables.contains_key(name) {
@@ -258,6 +269,23 @@ impl Environment {
             None => false,
         }
     }
+
+    pub fn assign_at(&mut self, name: &str, depth: usize, val: Value) -> bool {
+        if depth == 0 {
+            if self.variables.contains_key(name) {
+                self.variables.insert(name.to_string(), val);
+                true
+            } else {
+                false
+            }
+        } else {
+            match &self.parent {
+                Some(parent) => parent.borrow_mut().assign_at(name, depth-1, val),
+                None => false,
+            }
+        }
+    }
+
 
     pub fn define(&mut self, name: &str, val: Value) {
         self.variables.insert(name.to_string(), val);
