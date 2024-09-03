@@ -95,7 +95,7 @@ impl<'a> Parser<'a> {
 
         let name = self
             .consume_identifier("Expect variable name.")?
-            .to_string();
+            .0.to_string();
 
         if let Some(tok) = self.matches(TokenKind::Equal) {
             let expr = self.parse_expr()?;
@@ -117,21 +117,21 @@ impl<'a> Parser<'a> {
             "Expect 'fun' to begin function declaration.",
         )?;
 
-        let name = self.consume_identifier(format!("Expect {} name.", kind))?;
+        let name = self.consume_identifier(format!("Expect {} name.", kind))?.0;
         let lparen = self.consume(
             TokenKind::LeftParen,
             format!("Expect '(' after {} name.", kind),
         )?;
         let line = lparen.span.line; // use line number of opening parenthesis
 
-        let mut params: Vec<String> = vec![];
+        let mut params: Vec<(String, usize)> = vec![];
         if !self.check(TokenKind::RightParen) {
             loop {
                 if params.len() >= 255 {
                     return Err(self.parser_error("Can't have more than 255 parameters."));
                 }
-                let param = self.consume_identifier("Expect parameter name.")?;
-                params.push(param.to_string());
+                let (param, tok) = self.consume_identifier("Expect parameter name.")?;
+                params.push((param.to_string(), tok.span.line));
                 if !self.matches(TokenKind::Comma).is_some() {
                     break;
                 }
@@ -660,14 +660,14 @@ impl<'a> Parser<'a> {
         let lparen = self.consume(TokenKind::LeftParen, format!("Expect '(' after fun."))?;
         let line = lparen.span.line; // use line number of opening parenthesis
 
-        let mut params: Vec<String> = vec![];
+        let mut params: Vec<(String, usize)> = vec![];
         if !self.check(TokenKind::RightParen) {
             loop {
                 if params.len() >= 255 {
                     return Err(self.parser_error("Can't have more than 255 parameters."));
                 }
-                let param = self.consume_identifier("Expect parameter name.")?;
-                params.push(param.to_string());
+                let (param, tok) = self.consume_identifier("Expect parameter name.")?;
+                params.push((param.to_string(), tok.span.line));
                 if !self.matches(TokenKind::Comma).is_some() {
                     break;
                 }
@@ -860,9 +860,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn consume_identifier(&mut self, message: impl Into<String>) -> Result<&'a str, Error> {
-        if let Some((name, _)) = self.matches_identifier() {
-            Ok(name)
+    fn consume_identifier(&mut self, message: impl Into<String>) -> Result<(&'a str, Token<'a>), Error> {
+        if let Some((name, tok)) = self.matches_identifier() {
+            Ok((name, tok))
         } else {
             Err(self.parser_error(message))
         }

@@ -239,7 +239,7 @@ impl Interpreter {
             Expr::Function { params, body, line } => {
                 let fcn = Value::Callable(Rc::new(Callable::Function {
                     name: None,
-                    params: params.to_vec(),
+                    params: params.iter().map(|p| p.0.clone()).collect(),
                     body: body.to_vec(),
                     line: *line,
                     closure: Rc::clone(&self.env),
@@ -403,7 +403,7 @@ impl Interpreter {
             } => {
                 let fcn = Value::Callable(Rc::new(Callable::Function {
                     name: Some(name.to_string()),
-                    params: params.to_vec(),
+                    params: params.iter().map(|p| p.0.clone()).collect(),
                     body: body.to_vec(),
                     line: *line,
                     closure: Rc::clone(&self.env),

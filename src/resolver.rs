@@ -55,6 +55,10 @@ impl<'a> Scopes<'a> {
         }
         None
     }
+
+    fn is_global(&self, name: &'a str) -> bool {
+        self.depth_of(name) == Some(self.depth())
+    }
 }
 
 
@@ -85,14 +89,14 @@ fn resolve_stmt<'a>(
         Stmt::Function {
             name, params, body, line
         } => {
-            if !scopes.declare(name) {
+            if !scopes.declare(name) && !scopes.is_global(name) {
                 return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Already a variable with this name in this scope."));
             }
             scopes.define(name);
             resolve_function(params, body, scopes)?;
         }
         Stmt::Var { name, init, line } => {
-            if !scopes.declare(name) {
+            if !scopes.declare(name) && !scopes.is_global(name) {
                 return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Already a variable with this name in this scope."));
             }
             if let Some(init) = init {
@@ -156,7 +160,7 @@ fn resolve_expr<'a>(
         // these are the juicy cases
         Expr::Variable { name, line, depth } => {
             let name: &str = name;
-            if scopes.current_scope().get(name) == Some(&false) {
+            if scopes.current_scope().get(name) == Some(&false) && !scopes.is_global(name) {
                 return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Can't read local variable in its own initializer."));
             }
 
@@ -206,7 +210,7 @@ fn resolve_expr<'a>(
 }
 
 fn resolve_function<'a>(
-    params: &'a [String],
+    params: &'a [(String, usize)],
     body: &'a mut [Stmt],
     scopes: &mut Scopes<'a>,
 ) -> Result<(), Error> {
@@ -217,9 +221,9 @@ fn resolve_function<'a>(
     //     scopes.pop();
     // }
 
-    for param in params {
+    for (param, line) in params {
         if !scopes.declare(param) {
-            todo!("Return error on duplicate parameter name");
+            return Err(Error::parser_error_on_line_at_token(*line, param, "Already a variable with this name in this scope."));
         }
         scopes.define(param);
     }

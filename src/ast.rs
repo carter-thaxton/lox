@@ -23,7 +23,7 @@ pub enum Stmt {
     },
     Function {
         name: String,
-        params: Vec<String>,
+        params: Vec<(String, usize)>,
         body: Vec<Stmt>,
         line: usize,
     },
@@ -65,7 +65,7 @@ pub enum Expr {
         line: usize,
     },
     Function {
-        params: Vec<String>,
+        params: Vec<(String, usize)>,
         body: Vec<Stmt>,
         line: usize,
     },
@@ -128,7 +128,7 @@ impl Display for Expr {
                     if !first {
                         write!(f, ",")?;
                     }
-                    write!(f, "{}", param)?;
+                    write!(f, "{}", param.0)?;
                     first = false;
                 }
                 write!(f, "))")
