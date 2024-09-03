@@ -7,14 +7,14 @@ use std::iter::Peekable;
 
 enum FunctionKind {
     Function,
-    // Method,
+    Method,
 }
 
 impl Display for FunctionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             FunctionKind::Function => write!(f, "function"),
-            // FunctionKind::Method => write!(f, "method"),
+            FunctionKind::Method => write!(f, "method"),
         }
     }
 }
@@ -80,7 +80,18 @@ impl<'a> Parser<'a> {
 
         // class <name> { ( <method> )* }
         if self.matches(TokenKind::Class).is_some() {
-            todo!();
+            let (name, tok) = self.consume_identifier("Expect class name.")?;
+            self.consume(TokenKind::LeftBrace, "Expect '{' before class body.")?;
+
+            let mut methods: Vec<Stmt> = vec![];
+            while !self.at_eof() && !self.check(TokenKind::RightBrace) {
+                let method = self.parse_fun_decl(FunctionKind::Method)?;
+                methods.push(method);
+            }
+
+            self.consume(TokenKind::RightBrace, "Expect '}' after class body.")?;
+
+            return Ok(Stmt::Class { name: name.to_string(), methods, line: tok.span.line });
         }
 
         // fun <name> ( (<arg>, )* ) { <body> }
@@ -114,7 +125,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error> {
-        let name = self.consume_identifier(format!("Expect {} name.", kind))?.0;
+        let (name, _tok) = self.consume_identifier(format!("Expect {} name.", kind))?;
         let lparen = self.consume(
             TokenKind::LeftParen,
             format!("Expect '(' after {} name.", kind),

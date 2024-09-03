@@ -410,6 +410,15 @@ impl Interpreter {
                 self.env.borrow_mut().define(name, fcn);
             }
 
+            Stmt::Class {
+                name,
+                methods,
+                line,
+            } => {
+                _ = (name, methods, line);
+                todo!("Implement classes in interpreter");
+            }
+
             Stmt::Return(expr) => {
                 let val = if let Some(expr) = expr {
                     self.evaluate(expr)?

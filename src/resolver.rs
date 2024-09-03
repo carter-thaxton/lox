@@ -73,8 +73,15 @@ impl<'a> Scopes<'a> {
             true
         }
     }
-}
 
+    // like declare, but raises an appropriate error when there's a duplicate name in the same scope
+    fn declare_and_check<'b: 'a>(&mut self, name: &'b str, line: usize) -> Result<(), Error> {
+        if !self.declare(name) && !self.is_global(name) {
+            return Err(Error::parser_error_on_line_at_token(line, name.to_string(), "Already a variable with this name in this scope."));
+        }
+        Ok(())
+    }
+}
 
 //
 // second pass - resolve declarations
@@ -103,23 +110,23 @@ fn resolve_stmt<'a>(
 ) -> Result<(), Error> {
     match stmt {
         // these are the juicy cases
-        Stmt::Function {
-            name, params, body, line
-        } => {
-            if !scopes.declare(name) && !scopes.is_global(name) {
-                return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Already a variable with this name in this scope."));
-            }
-            scopes.define(name);
-            resolve_function(params, body, scopes)?;
-        }
         Stmt::Var { name, init, line } => {
-            if !scopes.declare(name) && !scopes.is_global(name) {
-                return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Already a variable with this name in this scope."));
-            }
+            scopes.declare_and_check(name, *line)?;
             if let Some(init) = init {
                 resolve_expr(init, scopes)?;
             }
             scopes.define(name);
+        }
+        Stmt::Function {
+            name, params, body, line
+        } => {
+            scopes.declare_and_check(name, *line)?;
+            scopes.define(name);
+            resolve_function(params, body, scopes)?;
+        }
+        Stmt::Class { name, methods: _, line } => {
+            scopes.declare_and_check(name, *line)?;
+            // TODO: resolve methods
         }
 
         // below simply walks the AST

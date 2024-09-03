@@ -27,6 +27,11 @@ pub enum Stmt {
         body: Vec<Stmt>,
         line: usize,
     },
+    Class {
+        name: String,
+        methods: Vec<Stmt>, // all Stmt::Function
+        line: usize,
+    },
     Return(Option<Box<Expr>>),
     Break,
     Continue,
