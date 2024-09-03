@@ -74,13 +74,22 @@ impl<'a> Parser<'a> {
         }
 
         // var <name> (= <expr>)? ;
-        if self.check(TokenKind::Var) {
+        if self.matches(TokenKind::Var).is_some() {
             return self.parse_var_decl();
+        }
+
+        // class <name> { ( <method> )* }
+        if self.matches(TokenKind::Class).is_some() {
+            todo!();
         }
 
         // fun <name> ( (<arg>, )* ) { <body> }
         // explicitly look ahead two tokens, for 'fun <name>', to allow for anonymous 'fun' expressions
         if self.check2_p(|t1, t2| *t1 == TokenKind::Fun && matches!(t2, TokenKind::Identifier(_))) {
+            self.consume(
+                TokenKind::Fun,
+                "Expect 'fun' to begin function declaration.",
+            )?;
             return self.parse_fun_decl(FunctionKind::Function);
         }
 
@@ -88,35 +97,23 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var_decl(&mut self) -> Result<Stmt, Error> {
-        let tok = self.consume(
-            TokenKind::Var,
-            "Expect 'var' to begin variable declaration.",
-        )?;
-
-        let name = self
-            .consume_identifier("Expect variable name.")?
-            .0.to_string();
+        let (name, tok) = self.consume_identifier("Expect variable name.")?;
 
         if let Some(tok) = self.matches(TokenKind::Equal) {
             let expr = self.parse_expr()?;
             self.consume(TokenKind::Semicolon, "Expect ';' after value.")?;
             return Ok(Stmt::Var {
-                name,
+                name: name.to_string(),
                 init: Some(expr),
                 line: tok.span.line,
             });
         } else {
             self.consume(TokenKind::Semicolon, "Expect ';' after var.")?;
-            return Ok(Stmt::Var { name, init: None, line: tok.span.line });
+            return Ok(Stmt::Var { name: name.to_string(), init: None, line: tok.span.line });
         }
     }
 
     fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error> {
-        self.consume(
-            TokenKind::Fun,
-            "Expect 'fun' to begin function declaration.",
-        )?;
-
         let name = self.consume_identifier(format!("Expect {} name.", kind))?.0;
         let lparen = self.consume(
             TokenKind::LeftParen,
@@ -214,7 +211,7 @@ impl<'a> Parser<'a> {
 
             let init = if self.matches(TokenKind::Semicolon).is_some() {
                 None
-            } else if self.check(TokenKind::Var) {
+            } else if self.matches(TokenKind::Var).is_some() {
                 Some(self.parse_var_decl()?)
             } else {
                 Some(self.parse_expr_stmt()?)
