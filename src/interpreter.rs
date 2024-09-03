@@ -315,7 +315,10 @@ impl Interpreter {
 
             Callable::Builtin { fcn, .. } => Ok(fcn(args)?),
 
-            Callable::Class { .. } => Err(Error::runtime_error("Classes not yet supported")),
+            Callable::Class { .. } => {
+                let inst = Instance::new(callee);
+                Ok(Value::Instance(Rc::new(RefCell::new(inst))))
+            }
         }
     }
 

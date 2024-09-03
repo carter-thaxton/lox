@@ -150,6 +150,32 @@ impl Callable {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Instance {
+    class: Rc<Callable>, // always a Callable::Class
+    fields: HashMap<String, Value>,
+}
+
+impl Display for Instance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match &*self.class {
+            Callable::Class { name, .. } => {
+                write!(f, "{} instance", name)
+            }
+            _ => panic!("Must be a Callable::Class"),
+        }
+    }
+}
+
+impl Instance {
+    pub fn new(class: Rc<Callable>) -> Self {
+        Instance {
+            class,
+            fields: HashMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
@@ -158,6 +184,7 @@ pub enum Value {
     Number(f64),
     String(String),
     Callable(Rc<Callable>),
+    Instance(Rc<RefCell<Instance>>),
 }
 
 impl Display for Value {
@@ -181,6 +208,9 @@ impl Display for Value {
             }
             Value::Callable(c) => {
                 write!(f, "{}", c)
+            }
+            Value::Instance(i) => {
+                write!(f, "{}", i.borrow())
             }
         }
     }
