@@ -52,6 +52,9 @@ impl Interpreter {
                     } else {
                         panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
                     }
+                } else if let Some(val) = self.env.borrow().get(name) {
+                    // may be a global variable, according to lox rules
+                    Ok(val.clone())
                 } else {
                     Err(Error::runtime_error(format!(
                         "Undefined variable '{}'.",
