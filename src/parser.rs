@@ -159,6 +159,12 @@ impl<'a> Parser<'a> {
         in_function: bool,
         in_loop: Option<LoopContext>,
     ) -> Result<Stmt, Error> {
+        // ;
+        while self.matches(TokenKind::Semicolon).is_some() {
+            // simply ignore empty statement
+        }
+
+        // expect ...
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
