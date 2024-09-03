@@ -409,7 +409,7 @@ impl<'a> Parser<'a> {
                     name,
                     right: Box::new(right),
                     line: tok.span.line,
-                    depth: None,
+                    depth_and_index: None,
                 });
             } else {
                 // return error referring to '='
@@ -638,7 +638,7 @@ impl<'a> Parser<'a> {
         if let Some((name, tok)) = self.matches_identifier() {
             return Ok(Expr::Variable {
                 name: name.to_string(),
-                depth: None,
+                depth_and_index: None,
                 line: tok.span.line,
             });
         }

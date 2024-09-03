@@ -216,28 +216,31 @@ pub fn compare_values(left: &Value, right: &Value) -> bool {
 
 #[derive(Clone)]
 pub struct Environment {
-    variables: HashMap<String, Value>,
+    values: Vec<Value>,
+    by_name: HashMap<String, usize>, // index into values
     parent: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
     pub fn global() -> Self {
         Environment {
-            variables: HashMap::new(),
+            values: vec![],
+            by_name: HashMap::new(),
             parent: None,
         }
     }
 
     pub fn new(parent: Rc<RefCell<Environment>>) -> Self {
         Environment {
-            variables: HashMap::new(),
+            values: vec![],
+            by_name: HashMap::new(),
             parent: Some(Rc::clone(&parent)),
         }
     }
 
     pub fn get(&self, name: &str) -> Option<Value> {
-        if let Some(val) = self.variables.get(name) {
-            return Some(val.clone());
+        if let Some(index) = self.by_name.get(name) {
+            return Some(self.values[*index].clone());
         }
 
         match &self.parent {
@@ -246,12 +249,16 @@ impl Environment {
         }
     }
 
-    pub fn get_at(&self, name: &str, depth: usize) -> Option<Value> {
+    pub fn get_at(&self, depth: usize, index: usize) -> Option<Value> {
         if depth == 0 {
-            self.variables.get(name).map(|val| val.clone())
+            if index < self.values.len() {
+                Some(self.values[index].clone())
+            } else {
+                None
+            }
         } else {
             match &self.parent {
-                Some(parent) => parent.borrow().get_at(name, depth-1),
+                Some(parent) => parent.borrow().get_at(depth-1, index),
                 None => None,
             }
         }
@@ -259,8 +266,12 @@ impl Environment {
 
     // returns true if successful, and false if variable is not defined
     pub fn assign(&mut self, name: &str, val: Value) -> bool {
-        if self.variables.contains_key(name) {
-            self.variables.insert(name.to_string(), val);
+        if let Some(index) = self.by_name.get(name) {
+            if self.values.len() < index + 1 {
+                self.values.resize(index + 1, Value::Nil);
+            }
+            self.values[*index] = val;
+            self.by_name.insert(name.to_string(), *index);
             return true;
         }
 
@@ -270,35 +281,33 @@ impl Environment {
         }
     }
 
-    pub fn assign_at(&mut self, name: &str, depth: usize, val: Value) -> bool {
+    pub fn assign_at(&mut self, depth: usize, index: usize, val: Value) -> bool {
         if depth == 0 {
-            if self.variables.contains_key(name) {
-                self.variables.insert(name.to_string(), val);
+            if index < self.values.len() {
+                self.values[index] = val;
                 true
             } else {
                 false
             }
         } else {
             match &self.parent {
-                Some(parent) => parent.borrow_mut().assign_at(name, depth-1, val),
+                Some(parent) => parent.borrow_mut().assign_at(depth-1, index, val),
                 None => false,
             }
         }
     }
 
-
-    pub fn define(&mut self, name: &str, val: Value) {
-        self.variables.insert(name.to_string(), val);
+    // returns index of variable
+    // if variable was already defined, sets the value and returns the existing index
+    pub fn define(&mut self, name: &str, val: Value) -> usize {
+        if let Some(index) = self.by_name.get(name) {
+            self.values[*index] = val;
+            *index
+        } else {
+            let index = self.values.len();
+            self.values.push(val);
+            self.by_name.insert(name.to_string(), index);
+            index
+        }
     }
-
-    // pub fn is_defined(&self, name: &str) -> bool {
-    //     if self.variables.contains_key(name) {
-    //         return true;
-    //     }
-
-    //     match &self.parent {
-    //         Some(parent) => parent.is_defined(name),
-    //         None => false,
-    //     }
-    // }
 }

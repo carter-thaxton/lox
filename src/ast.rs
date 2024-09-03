@@ -51,13 +51,13 @@ pub enum Expr {
     Variable {
         name: String,
         line: usize,
-        depth: Option<usize>,
+        depth_and_index: Option<(usize, usize)>,
     },
     Assign {
         name: String,
         right: Box<Expr>,
         line: usize,
-        depth: Option<usize>,
+        depth_and_index: Option<(usize, usize)>,
     },
     Call {
         callee: Box<Expr>,

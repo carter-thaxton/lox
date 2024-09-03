@@ -45,9 +45,9 @@ impl Interpreter {
 
             Expr::Group(expr) => self.evaluate(expr),
 
-            Expr::Variable { name, depth, .. } => {
-                if let Some(depth) = depth {
-                    if let Some(val) = self.env.borrow().get_at(name, *depth) {
+            Expr::Variable { name, depth_and_index, .. } => {
+                if let Some((depth, index)) = depth_and_index {
+                    if let Some(val) = self.env.borrow().get_at(*depth, *index) {
                         Ok(val.clone())
                     } else {
                         panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
@@ -210,10 +210,10 @@ impl Interpreter {
                 }
             }
 
-            Expr::Assign { name, right, depth, .. } => {
+            Expr::Assign { name, right, depth_and_index, .. } => {
                 let right = self.evaluate(right)?;
-                if let Some(depth) = depth {
-                    if self.env.borrow_mut().assign_at(name, *depth, right.clone()) {
+                if let Some((depth, index)) = depth_and_index {
+                    if self.env.borrow_mut().assign_at(*depth, *index, right.clone()) {
                         Ok(right)
                     } else {
                         panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
