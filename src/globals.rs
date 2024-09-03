@@ -1,4 +1,3 @@
-
 use crate::runtime::{Environment, Value};
 use std::time::Instant;
 
@@ -7,7 +6,7 @@ fn clock(start_time: &Instant) -> f64 {
 }
 
 pub fn global_names() -> Vec<&'static str> {
-  vec!["clock"]
+    vec!["clock"]
 }
 
 pub fn define_globals(env: &mut Environment) {
@@ -21,4 +20,3 @@ pub fn define_globals(env: &mut Environment) {
 
     env.define("clock", clock_fn);
 }
-

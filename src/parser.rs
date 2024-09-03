@@ -91,7 +91,11 @@ impl<'a> Parser<'a> {
 
             self.consume(TokenKind::RightBrace, "Expect '}' after class body.")?;
 
-            return Ok(Stmt::Class { name: name.to_string(), methods, line: tok.span.line });
+            return Ok(Stmt::Class {
+                name: name.to_string(),
+                methods,
+                line: tok.span.line,
+            });
         }
 
         // fun <name> ( (<arg>, )* ) { <body> }
@@ -120,7 +124,11 @@ impl<'a> Parser<'a> {
             });
         } else {
             self.consume(TokenKind::Semicolon, "Expect ';' after var.")?;
-            return Ok(Stmt::Var { name: name.to_string(), init: None, line: tok.span.line });
+            return Ok(Stmt::Var {
+                name: name.to_string(),
+                init: None,
+                line: tok.span.line,
+            });
         }
     }
 
@@ -874,7 +882,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn consume_identifier(&mut self, message: impl Into<String>) -> Result<(&'a str, Token<'a>), Error> {
+    fn consume_identifier(
+        &mut self,
+        message: impl Into<String>,
+    ) -> Result<(&'a str, Token<'a>), Error> {
         if let Some((name, tok)) = self.matches_identifier() {
             Ok((name, tok))
         } else {

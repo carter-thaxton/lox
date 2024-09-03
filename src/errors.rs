@@ -178,7 +178,11 @@ impl Error {
         }
     }
 
-    pub fn parser_error_on_line_at_token(line: usize, token: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn parser_error_on_line_at_token(
+        line: usize,
+        token: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
         Error {
             kind: ErrorKind::ParserError(message.into()),
             span: Some(ErrorSpan::dummy_for_line_at_token(line, token)),
@@ -267,7 +271,9 @@ impl Error {
 
     fn at_message(&self) -> Cow<str> {
         let span: &ErrorSpan = match &self.kind {
-            ErrorKind::ParserError(_) => &self.span.as_ref().expect("ParserError should have a span"),
+            ErrorKind::ParserError(_) => {
+                &self.span.as_ref().expect("ParserError should have a span")
+            }
             _ => {
                 return "".into();
             }

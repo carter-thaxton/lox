@@ -45,7 +45,11 @@ impl Interpreter {
 
             Expr::Group(expr) => self.evaluate(expr),
 
-            Expr::Variable { name, depth_and_index, .. } => {
+            Expr::Variable {
+                name,
+                depth_and_index,
+                ..
+            } => {
                 if let Some((depth, index)) = depth_and_index {
                     if let Some(val) = self.env.borrow().get_at(*depth, *index) {
                         Ok(val.clone())
@@ -210,10 +214,19 @@ impl Interpreter {
                 }
             }
 
-            Expr::Assign { name, right, depth_and_index, .. } => {
+            Expr::Assign {
+                name,
+                right,
+                depth_and_index,
+                ..
+            } => {
                 let right = self.evaluate(right)?;
                 if let Some((depth, index)) = depth_and_index {
-                    if self.env.borrow_mut().assign_at(*depth, *index, right.clone()) {
+                    if self
+                        .env
+                        .borrow_mut()
+                        .assign_at(*depth, *index, right.clone())
+                    {
                         Ok(right)
                     } else {
                         panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
@@ -299,7 +312,10 @@ impl Interpreter {
                 self.env = orig_env;
                 Ok(Value::Nil)
             }
+
             Callable::Builtin { fcn, .. } => Ok(fcn(args)?),
+
+            Callable::Class { .. } => Err(Error::runtime_error("Classes not yet supported")),
         }
     }
 
@@ -311,11 +327,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_to_numbers(
-        &mut self,
-        left: &Expr,
-        right: &Expr,
-    ) -> Result<(f64, f64), Error> {
+    fn evaluate_to_numbers(&mut self, left: &Expr, right: &Expr) -> Result<(f64, f64), Error> {
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
         match (left, right) {

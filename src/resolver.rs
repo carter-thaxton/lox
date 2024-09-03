@@ -77,7 +77,11 @@ impl<'a> Scopes<'a> {
     // like declare, but raises an appropriate error when there's a duplicate name in the same scope
     fn declare_and_check<'b: 'a>(&mut self, name: &'b str, line: usize) -> Result<(), Error> {
         if !self.declare(name) && !self.is_global(name) {
-            return Err(Error::parser_error_on_line_at_token(line, name.to_string(), "Already a variable with this name in this scope."));
+            return Err(Error::parser_error_on_line_at_token(
+                line,
+                name.to_string(),
+                "Already a variable with this name in this scope.",
+            ));
         }
         Ok(())
     }
@@ -104,10 +108,7 @@ pub fn resolve(program: &mut Program) -> Result<(), Error> {
     Ok(())
 }
 
-fn resolve_stmt<'a>(
-    stmt: &'a mut Stmt,
-    scopes: &mut Scopes<'a>,
-) -> Result<(), Error> {
+fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), Error> {
     match stmt {
         // these are the juicy cases
         Stmt::Var { name, init, line } => {
@@ -118,13 +119,20 @@ fn resolve_stmt<'a>(
             scopes.define(name);
         }
         Stmt::Function {
-            name, params, body, line
+            name,
+            params,
+            body,
+            line,
         } => {
             scopes.declare_and_check(name, *line)?;
             scopes.define(name);
             resolve_function(params, body, scopes)?;
         }
-        Stmt::Class { name, methods: _, line } => {
+        Stmt::Class {
+            name,
+            methods: _,
+            line,
+        } => {
             scopes.declare_and_check(name, *line)?;
             // TODO: resolve methods
         }
@@ -176,16 +184,23 @@ fn resolve_stmt<'a>(
     Ok(())
 }
 
-fn resolve_expr<'a>(
-    expr: &'a mut Expr,
-    scopes: &mut Scopes<'a>,
-) -> Result<(), Error> {
+fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), Error> {
     match expr {
         // these are the juicy cases
-        Expr::Variable { name, line, depth_and_index } => {
+        Expr::Variable {
+            name,
+            line,
+            depth_and_index,
+        } => {
             let name: &str = name;
-            if matches!(scopes.current_scope().get(name), Some((_, false))) && !scopes.is_global(name) {
-                return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Can't read local variable in its own initializer."));
+            if matches!(scopes.current_scope().get(name), Some((_, false)))
+                && !scopes.is_global(name)
+            {
+                return Err(Error::parser_error_on_line_at_token(
+                    *line,
+                    name.to_string(),
+                    "Can't read local variable in its own initializer.",
+                ));
             }
 
             if let Some((depth, index)) = scopes.depth_and_index_of(name) {
@@ -194,7 +209,12 @@ fn resolve_expr<'a>(
                 // TODO: handle references to undefined variables at compile-time?
             }
         }
-        Expr::Assign { name, right, depth_and_index, .. } => {
+        Expr::Assign {
+            name,
+            right,
+            depth_and_index,
+            ..
+        } => {
             resolve_expr(right, scopes)?;
 
             let name: &str = name;
@@ -236,7 +256,6 @@ fn resolve_function<'a>(
     body: &'a mut [Stmt],
     scopes: &mut Scopes<'a>,
 ) -> Result<(), Error> {
-
     // be sure to pop this before exiting
     scopes.push();
     // defer! {
@@ -245,7 +264,11 @@ fn resolve_function<'a>(
 
     for (param, line) in params {
         if !scopes.declare(param) {
-            return Err(Error::parser_error_on_line_at_token(*line, param, "Already a variable with this name in this scope."));
+            return Err(Error::parser_error_on_line_at_token(
+                *line,
+                param,
+                "Already a variable with this name in this scope.",
+            ));
         }
         scopes.define(param);
     }
@@ -255,7 +278,7 @@ fn resolve_function<'a>(
         match resolve_stmt(stmt, scopes) {
             Err(err) => {
                 scopes.pop();
-                return Err(err)
+                return Err(err);
             }
             _ => {}
         }

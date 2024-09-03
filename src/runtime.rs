@@ -18,12 +18,19 @@ pub enum Callable {
         arity: usize,
         fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
     },
+    Class {
+        name: String,
+        methods: Vec<Stmt>,
+        line: usize,
+        // closure?
+    },
 }
 
 // all this, because we can't derive PartialEq for builtin functions
 impl PartialEq for Callable {
     fn eq(&self, other: &Callable) -> bool {
         match (self, other) {
+            // Function
             (
                 Callable::Function {
                     name: my_name,
@@ -40,6 +47,8 @@ impl PartialEq for Callable {
                     ..
                 },
             ) => my_name == name && my_params == params && my_body == body && my_line == line,
+
+            // Builtin
             (
                 Callable::Builtin {
                     name: my_name,
@@ -51,6 +60,23 @@ impl PartialEq for Callable {
                 // match builtins only by name and arity
                 my_name == name && my_arity == arity
             }
+
+            // Class
+            (
+                Callable::Class {
+                    name: my_name,
+                    methods: my_methods,
+                    line: my_line,
+                    ..
+                },
+                Callable::Class {
+                    name,
+                    methods,
+                    line,
+                    ..
+                },
+            ) => my_name == name && my_methods == methods && my_line == line,
+
             _ => false,
         }
     }
@@ -85,6 +111,9 @@ impl Debug for Callable {
                 }
                 write!(f, ")")?;
             }
+            Callable::Class { name, .. } => {
+                write!(f, "class {}()", name)?;
+            }
         }
         todo!()
     }
@@ -104,6 +133,9 @@ impl Display for Callable {
             Callable::Builtin { .. } => {
                 write!(f, "<native fn>")
             }
+            Callable::Class { name, .. } => {
+                write!(f, "<class {}>", name)
+            }
         }
     }
 }
@@ -113,6 +145,7 @@ impl Callable {
         match self {
             Callable::Function { params, .. } => params.len(),
             Callable::Builtin { arity, .. } => *arity,
+            Callable::Class { .. } => 0, // TODO: support constructors
         }
     }
 }
@@ -258,7 +291,7 @@ impl Environment {
             }
         } else {
             match &self.parent {
-                Some(parent) => parent.borrow().get_at(depth-1, index),
+                Some(parent) => parent.borrow().get_at(depth - 1, index),
                 None => None,
             }
         }
@@ -291,7 +324,7 @@ impl Environment {
             }
         } else {
             match &self.parent {
-                Some(parent) => parent.borrow_mut().assign_at(depth-1, index, val),
+                Some(parent) => parent.borrow_mut().assign_at(depth - 1, index, val),
                 None => false,
             }
         }

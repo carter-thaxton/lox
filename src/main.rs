@@ -164,11 +164,7 @@ fn test(input: &str) {
             if !expected_parser_errors.is_empty() {
                 // no parser error, but one was expected
                 let expected = &expected_parser_errors[0];
-                println!(
-                    "{}: Expected parser error: {}",
-                    "FAIL".red(),
-                    expected
-                );
+                println!("{}: Expected parser error: {}", "FAIL".red(), expected);
                 std::process::exit(EX_CONFIG);
             }
 
