@@ -86,14 +86,14 @@ fn resolve_stmt<'a>(
             name, params, body, line
         } => {
             if !scopes.declare(name) {
-                return Err(Error::parser_error_on_line(*line, "Already a variable with this name in this scope."));
+                return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Already a variable with this name in this scope."));
             }
             scopes.define(name);
             resolve_function(params, body, scopes)?;
         }
         Stmt::Var { name, init, line } => {
             if !scopes.declare(name) {
-                return Err(Error::parser_error_on_line(*line, "Already a variable with this name in this scope."));
+                return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Already a variable with this name in this scope."));
             }
             if let Some(init) = init {
                 resolve_expr(init, scopes)?;
@@ -157,7 +157,7 @@ fn resolve_expr<'a>(
         Expr::Variable { name, line, depth } => {
             let name: &str = name;
             if scopes.current_scope().get(name) == Some(&false) {
-                return Err(Error::parser_error_on_line(*line, "Can't read local variable in its own initializer."));
+                return Err(Error::parser_error_on_line_at_token(*line, name.to_string(), "Can't read local variable in its own initializer."));
             }
 
             if let Some(d) = scopes.depth_of(name) {

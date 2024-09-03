@@ -25,6 +25,14 @@ impl ErrorSpan {
             lexeme: None,
         }
     }
+
+    fn dummy_for_line_at_token(line: usize, token: impl Into<String>) -> Self {
+        ErrorSpan {
+            line,
+            col: 0,
+            lexeme: Some(token.into()),
+        }
+    }
 }
 
 impl From<Span<'_>> for ErrorSpan {
@@ -167,6 +175,13 @@ impl Error {
         Error {
             kind: ErrorKind::ParserError(message.into()),
             span: Some(ErrorSpan::dummy_for_line(line)),
+        }
+    }
+
+    pub fn parser_error_on_line_at_token(line: usize, token: impl Into<String>, message: impl Into<String>) -> Self {
+        Error {
+            kind: ErrorKind::ParserError(message.into()),
+            span: Some(ErrorSpan::dummy_for_line_at_token(line, token)),
         }
     }
 
