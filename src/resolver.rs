@@ -69,7 +69,6 @@ impl<'a> Scopes<'a> {
 // checks variables, assignments, and functions, producing appropriate errors.
 //
 // currently, the only mutation to the AST is to set the 'depth' on any Variable and Assign expressions.
-// TODO: do anonymous function expressions need any special treatment?
 //
 pub fn resolve(program: &mut Program) -> Result<(), Error> {
     let mut scopes = Scopes::new();
@@ -170,10 +169,9 @@ fn resolve_expr<'a>(
             }
 
             if let Some(d) = scopes.depth_of(name) {
-                // resolved variable
                 *depth = Some(d);
             } else {
-                // TODO: handle references to undefined variables
+                // TODO: handle references to undefined variables at compile-time?
             }
         }
         Expr::Assign { name, right, depth, .. } => {
@@ -181,14 +179,13 @@ fn resolve_expr<'a>(
 
             let name: &str = name;
             if let Some(d) = scopes.depth_of(name) {
-                // resolved variable
                 *depth = Some(d);
             } else {
-                // TODO: handle references to undefined variables
+                // TODO: handle references to undefined variables at compile-time?
             }
         }
-        Expr::Function { .. } => {
-            todo!("Handle anonymous function expressions")
+        Expr::Function { params, body, .. } => {
+            resolve_function(params, body, scopes)?;
         }
 
         // below simply walks the AST
