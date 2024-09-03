@@ -134,7 +134,7 @@ impl Display for Callable {
                 write!(f, "<native fn>")
             }
             Callable::Class { name, .. } => {
-                write!(f, "<class {}>", name)
+                write!(f, "{}", name)
             }
         }
     }

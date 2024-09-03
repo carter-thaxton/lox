@@ -427,8 +427,13 @@ impl Interpreter {
                 methods,
                 line,
             } => {
-                _ = (name, methods, line);
-                todo!("Implement classes in interpreter");
+                let class = Value::Callable(Rc::new(Callable::Class {
+                    name: name.to_string(),
+                    methods: methods.to_vec(),
+                    line: *line,
+                }));
+
+                self.env.borrow_mut().define(name, class);
             }
 
             Stmt::Return(expr) => {
