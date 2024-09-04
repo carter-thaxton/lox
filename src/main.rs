@@ -150,6 +150,9 @@ fn run(input: &str) {
 }
 
 fn test(input: &str) {
+    // always output with colors
+    colored::control::set_override(true);
+
     // two passes
 
     // first, find all expected parser and runtime errors
