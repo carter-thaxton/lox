@@ -26,7 +26,7 @@ const EX_CONFIG: i32 = 78; // used for test errors
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
-        eprintln!("Usage: {} <command> <filename>\n  command may be one of: tokenize, parse, evaluate, run, test\n", args[0]);
+        eprintln!("Usage: {} <command> <filename>\n  command may be one of: tokenize, tokenize_test, parse, evaluate, run, test\n", args[0]);
         std::process::exit(EX_USAGE);
     }
 
