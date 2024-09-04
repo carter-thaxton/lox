@@ -5,136 +5,116 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::rc::Rc;
 
-pub enum Callable {
-    Function {
-        name: Option<String>,
-        params: Vec<String>,
-        body: Vec<Stmt>,
-        line: usize,
-        closure: Rc<RefCell<Environment>>,
-    },
-    Builtin {
-        name: String,
-        arity: usize,
-        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
-    },
-    Class {
-        name: String,
-        methods: Vec<Stmt>,
-        line: usize,
-        // closure?
-    },
+#[derive(Clone)]
+pub struct Function {
+    pub name: Option<String>,
+    pub params: Vec<String>,
+    pub body: Vec<Stmt>,
+    pub line: usize,
+    pub closure: Rc<RefCell<Environment>>,
 }
 
-// all this, because we can't derive PartialEq for builtin functions
-impl PartialEq for Callable {
-    fn eq(&self, other: &Callable) -> bool {
-        match (self, other) {
-            // Function
-            (
-                Callable::Function {
-                    name: my_name,
-                    params: my_params,
-                    body: my_body,
-                    line: my_line,
-                    ..
-                },
-                Callable::Function {
-                    name,
-                    params,
-                    body,
-                    line,
-                    ..
-                },
-            ) => my_name == name && my_params == params && my_body == body && my_line == line,
-
-            // Builtin
-            (
-                Callable::Builtin {
-                    name: my_name,
-                    arity: my_arity,
-                    ..
-                },
-                Callable::Builtin { name, arity, .. },
-            ) => {
-                // match builtins only by name and arity
-                my_name == name && my_arity == arity
-            }
-
-            // Class
-            (
-                Callable::Class {
-                    name: my_name,
-                    methods: my_methods,
-                    line: my_line,
-                    ..
-                },
-                Callable::Class {
-                    name,
-                    methods,
-                    line,
-                    ..
-                },
-            ) => my_name == name && my_methods == methods && my_line == line,
-
-            _ => false,
-        }
+impl PartialEq for Function {
+    fn eq(&self, other: &Function) -> bool {
+        self.name == other.name
+            && self.params == other.params
+            && self.body == other.body
+            && self.line == other.line
     }
 }
 
-impl Debug for Callable {
+impl Debug for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Callable::Function { name, params, .. } => {
-                if let Some(name) = name {
-                    write!(f, "function {}(", name)?;
-                } else {
-                    write!(f, "function (")?;
-                }
-                let mut first = true;
-                for param in params {
-                    if !first {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", param)?;
-                    first = false;
-                }
-                write!(f, ")")?;
-            }
-            Callable::Builtin { name, arity, .. } => {
-                write!(f, "builtin function {}(", name)?;
-                for i in 0..*arity {
-                    if i != 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "_")?;
-                }
-                write!(f, ")")?;
-            }
-            Callable::Class { name, .. } => {
-                write!(f, "class {}()", name)?;
-            }
+        if let Some(name) = &self.name {
+            write!(f, "function {}(", name)?;
+        } else {
+            write!(f, "function (")?;
         }
-        todo!()
+        let mut first = true;
+        for param in &self.params {
+            if !first {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", param)?;
+            first = false;
+        }
+        write!(f, ")")
     }
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        if let Some(name) = &self.name {
+            write!(f, "<fn {}>", name)
+        } else {
+            write!(f, "<anonymous fn>")
+        }
+    }
+}
+
+pub struct BuiltinFunction {
+    pub name: String,
+    pub arity: usize,
+    pub fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
+}
+
+impl PartialEq for BuiltinFunction {
+    fn eq(&self, other: &BuiltinFunction) -> bool {
+        self.name == other.name && self.arity == other.arity
+    }
+}
+
+impl Debug for BuiltinFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "builtin function {}(", self.name)?;
+        for i in 0..self.arity {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "_")?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl Display for BuiltinFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "<native fn>")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Class {
+    pub name: String,
+    pub methods: Vec<Stmt>,
+    pub line: usize,
+    // closure?
+}
+
+impl Display for Class {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.name)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Callable {
+    Function(Function),
+    Builtin(BuiltinFunction),
+    Class(Rc<Class>),
 }
 
 impl Display for Callable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Callable::Function {
-                name: Some(name), ..
-            } => {
-                write!(f, "<fn {}>", name)
+            Callable::Function(fcn) => {
+                write!(f, "{}", fcn)
             }
-            Callable::Function { name: None, .. } => {
-                write!(f, "<anonymous fn>")
+            Callable::Builtin(fcn) => {
+                write!(f, "{}", fcn)
             }
-            Callable::Builtin { .. } => {
-                write!(f, "<native fn>")
-            }
-            Callable::Class { name, .. } => {
-                write!(f, "{}", name)
+            Callable::Class(class) => {
+                write!(f, "{}", class)
             }
         }
     }
@@ -143,32 +123,27 @@ impl Display for Callable {
 impl Callable {
     pub fn arity(&self) -> usize {
         match self {
-            Callable::Function { params, .. } => params.len(),
-            Callable::Builtin { arity, .. } => *arity,
-            Callable::Class { .. } => 0, // TODO: support constructors
+            Callable::Function(f) => f.params.len(),
+            Callable::Builtin(f) => f.arity,
+            Callable::Class(_c) => 0, // TODO: support constructors
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Instance {
-    class: Rc<Callable>, // always a Callable::Class
+    class: Rc<Class>,
     fields: HashMap<String, Value>,
 }
 
 impl Display for Instance {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match &*self.class {
-            Callable::Class { name, .. } => {
-                write!(f, "{} instance", name)
-            }
-            _ => panic!("Must be a Callable::Class"),
-        }
+        write!(f, "{} instance", self.class.name)
     }
 }
 
 impl Instance {
-    pub fn new(class: Rc<Callable>) -> Self {
+    pub fn new(class: Rc<Class>) -> Self {
         Instance {
             class,
             fields: HashMap::new(),
@@ -258,11 +233,12 @@ impl Value {
         arity: usize,
         fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
     ) -> Value {
-        Value::Callable(Rc::new(Callable::Builtin {
+        let fcn = BuiltinFunction {
             name: name.into(),
             arity,
             fcn,
-        }))
+        };
+        Value::Callable(Rc::new(Callable::Builtin(fcn)))
     }
 }
 

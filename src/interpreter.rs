@@ -248,14 +248,14 @@ impl Interpreter {
             }
 
             Expr::Function { params, body, line } => {
-                let fcn = Value::Callable(Rc::new(Callable::Function {
+                let fcn = Function {
                     name: None,
                     params: params.iter().map(|p| p.0.clone()).collect(),
                     body: body.to_vec(),
                     line: *line,
                     closure: Rc::clone(&self.env),
-                }));
-                return Ok(fcn);
+                };
+                return Ok(Value::Callable(Rc::new(Callable::Function(fcn))));
             }
 
             _ => Err(Error::runtime_error("Unexpected expression.")),
@@ -277,19 +277,14 @@ impl Interpreter {
         }
 
         match &*callee {
-            Callable::Function {
-                params,
-                body,
-                closure,
-                ..
-            } => {
-                let orig_env = self.enter(closure.clone());
+            Callable::Function(f) => {
+                let orig_env = self.enter(f.closure.clone());
 
-                for (i, param) in params.iter().enumerate() {
+                for (i, param) in f.params.iter().enumerate() {
                     self.env.borrow_mut().define(param, args[i].clone());
                 }
 
-                for stmt in body {
+                for stmt in &f.body {
                     let result = self.execute(&stmt);
 
                     match result {
@@ -313,10 +308,10 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            Callable::Builtin { fcn, .. } => Ok(fcn(args)?),
+            Callable::Builtin(f) => Ok((f.fcn)(args)?),
 
-            Callable::Class { .. } => {
-                let inst = Instance::new(callee);
+            Callable::Class(class) => {
+                let inst = Instance::new(Rc::clone(class));
                 Ok(Value::Instance(Rc::new(RefCell::new(inst))))
             }
         }
@@ -414,15 +409,17 @@ impl Interpreter {
                 body,
                 line,
             } => {
-                let fcn = Value::Callable(Rc::new(Callable::Function {
+                let fcn = Function {
                     name: Some(name.to_string()),
                     params: params.iter().map(|p| p.0.clone()).collect(),
                     body: body.to_vec(),
                     line: *line,
                     closure: Rc::clone(&self.env),
-                }));
+                };
 
-                self.env.borrow_mut().define(name, fcn);
+                let fcn_val = Value::Callable(Rc::new(Callable::Function(fcn)));
+
+                self.env.borrow_mut().define(name, fcn_val);
             }
 
             Stmt::Class {
@@ -430,13 +427,15 @@ impl Interpreter {
                 methods,
                 line,
             } => {
-                let class = Value::Callable(Rc::new(Callable::Class {
+                let class = Class {
                     name: name.to_string(),
                     methods: methods.to_vec(),
                     line: *line,
-                }));
+                };
 
-                self.env.borrow_mut().define(name, class);
+                let class_val = Value::Callable(Rc::new(Callable::Class(Rc::new(class))));
+
+                self.env.borrow_mut().define(name, class_val);
             }
 
             Stmt::Return(expr) => {
