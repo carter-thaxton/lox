@@ -37,8 +37,8 @@ pub struct Function {
 
 impl PartialEq for Function {
     fn eq(&self, other: &Function) -> bool {
-        // compare functions only by their declaration
-        self.declaration == other.declaration
+        // use reference equality
+        Rc::ptr_eq(&self.declaration, &other.declaration) && Rc::ptr_eq(&self.closure, &other.closure)
     }
 }
 
@@ -63,7 +63,7 @@ impl Function {
         }
     }
 
-    pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Function {
+    pub fn bind(&self, instance: Instance) -> Function {
         let mut env = Environment::new(Rc::clone(&self.closure));
         env.define("this", Value::Instance(instance));
         Function {
@@ -184,10 +184,17 @@ impl Callable {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Instance {
     class: Rc<Class>,
-    fields: HashMap<String, Value>,
+    fields: Rc<RefCell<HashMap<String, Value>>>,
+}
+
+impl PartialEq for Instance {
+    fn eq(&self, other: &Instance) -> bool {
+        // use reference equality
+        Rc::ptr_eq(&self.class, &other.class) && Rc::ptr_eq(&self.fields, &other.fields)
+    }
 }
 
 impl Display for Instance {
@@ -200,26 +207,24 @@ impl Instance {
     pub fn new(class: Rc<Class>) -> Self {
         Instance {
             class,
-            fields: HashMap::new(),
+            fields: Rc::new(RefCell::new(HashMap::new())),
         }
     }
-}
 
-// this can't be a method on Instance, because it requires access to the whole Rc<RefCell<Instance>> to bind 'this' for methods
-pub fn get_property(instance: &Rc<RefCell<Instance>>, name: &str) -> Option<Value> {
-    if let Some(val) = instance.borrow().fields.get(name) {
-        Some(val.clone())
-    } else if let Some(method) = instance.borrow().class.find_method(name) {
-        let method = method.bind(Rc::clone(instance));
-        Some(Value::Callable(Callable::Function(method)))
-    } else {
-        None
+    pub fn get(&self, name: &str) -> Option<Value> {
+        if let Some(val) = self.fields.borrow().get(name) {
+            Some(val.clone())
+        } else if let Some(method) = self.class.find_method(name) {
+            let method = method.bind(self.clone());
+            Some(Value::Callable(Callable::Function(method)))
+        } else {
+            None
+        }
     }
-}
 
-// use a function here for symmetry
-pub fn set_property(instance: &Rc<RefCell<Instance>>, name: impl Into<String>, value: Value) {
-    instance.borrow_mut().fields.insert(name.into(), value);
+    pub fn set(&self, name: impl Into<String>, value: Value) {
+        self.fields.borrow_mut().insert(name.into(), value);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -230,7 +235,7 @@ pub enum Value {
     Number(f64),
     String(String),
     Callable(Callable),
-    Instance(Rc<RefCell<Instance>>),
+    Instance(Instance),
 }
 
 impl Display for Value {
@@ -256,7 +261,7 @@ impl Display for Value {
                 write!(f, "{}", c)
             }
             Value::Instance(i) => {
-                write!(f, "{}", i.borrow())
+                write!(f, "{}", i)
             }
         }
     }

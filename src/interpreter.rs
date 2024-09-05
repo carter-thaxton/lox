@@ -192,7 +192,7 @@ impl Interpreter {
                 let object = self.evaluate(object)?;
                 match object {
                     Value::Instance(instance) => {
-                        if let Some(value) = get_property(&instance, property) {
+                        if let Some(value) = instance.get(property) {
                             Ok(value.clone())
                         } else {
                             Err(Error::runtime_error(format!("Undefined property '{}'.", property)))
@@ -207,7 +207,7 @@ impl Interpreter {
                 let value = self.evaluate(value)?;
                 match object {
                     Value::Instance(instance) => {
-                        set_property(&instance, property, value.clone());
+                        instance.set(property, value.clone());
                         Ok(value)
                     }
                     _ => Err(Error::runtime_error("Only instances have fields.")),
@@ -279,8 +279,8 @@ impl Interpreter {
             Callable::Builtin(f) => f.call(args),
 
             Callable::Class(class) => {
-                let inst = Instance::new(class);
-                Ok(Value::Instance(Rc::new(RefCell::new(inst))))
+                let instance = Instance::new(class);
+                Ok(Value::Instance(instance))
             }
         }
     }
