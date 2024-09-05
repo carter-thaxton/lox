@@ -246,6 +246,13 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
                 resolve_expr(arg, scopes)?;
             }
         }
+        Expr::Get { object, .. } => {
+            resolve_expr(object, scopes)?;
+        }
+        Expr::Set { object, value, .. } => {
+            resolve_expr(object, scopes)?;
+            resolve_expr(value, scopes)?;
+        }
     }
 
     Ok(())

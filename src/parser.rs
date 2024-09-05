@@ -427,6 +427,18 @@ impl<'a> Parser<'a> {
                     line: tok.span.line,
                     depth_and_index: None,
                 });
+            } else if let Expr::Get {
+                object, property, ..
+            } = left
+            {
+                // <left> is a get expressions, e.g. x.y = val;
+                let value = self.parse_assignment()?;
+                return Ok(Expr::Set {
+                    object,
+                    property,
+                    value: Box::new(value),
+                    line: tok.span.line,
+                });
             } else {
                 // return error referring to '='
                 return Err(Error::parser_error(tok.span, "Invalid assignment target."));
@@ -607,6 +619,15 @@ impl<'a> Parser<'a> {
                     callee: Box::new(left),
                     args,
                     line: closing_paren.span.line,
+                };
+            } else if self.matches(TokenKind::Dot).is_some() {
+                // <left> . <identifier>
+                let (property, tok) = self.consume_identifier("Expect property name after '.'.")?;
+
+                left = Expr::Get {
+                    object: Box::new(left),
+                    property: property.to_string(),
+                    line: tok.span.line,
                 };
             } else {
                 break;

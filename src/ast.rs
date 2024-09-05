@@ -74,6 +74,17 @@ pub enum Expr {
         body: Vec<Stmt>,
         line: usize,
     },
+    Get {
+        object: Box<Expr>,
+        property: String,
+        line: usize,
+    },
+    Set {
+        object: Box<Expr>,
+        property: String,
+        value: Box<Expr>,
+        line: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +148,19 @@ impl Display for Expr {
                     first = false;
                 }
                 write!(f, "))")
+            }
+            Expr::Get {
+                object, property, ..
+            } => {
+                write!(f, "(get {}.{})", object, property)
+            }
+            Expr::Set {
+                object,
+                property,
+                value,
+                ..
+            } => {
+                write!(f, "(set {}.{} = {})", object, property, value)
             }
         }
     }
