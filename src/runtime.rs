@@ -146,6 +146,14 @@ impl Instance {
             fields: HashMap::new(),
         }
     }
+
+    pub fn get(&self, name: &str) -> Option<&Value> {
+        self.fields.get(name)
+    }
+
+    pub fn set(&mut self, name: impl Into<String>, value: Value) {
+        self.fields.insert(name.into(), value);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -179,7 +179,7 @@ impl Interpreter {
                 let callee = self.evaluate(callee)?;
                 let args: Result<Vec<Value>, Error> = args.into_iter().map(|arg| self.evaluate(arg)).collect();
                 let args = args?;
-                return self.call(callee, &args);
+                self.call(callee, &args)
             }
 
             Expr::Function { params, body, line } => {
@@ -190,7 +190,37 @@ impl Interpreter {
                     line: *line,
                     closure: Rc::clone(&self.env),
                 };
-                return Ok(Value::Callable(Rc::new(Callable::Function(fcn))));
+                Ok(Value::Callable(Rc::new(Callable::Function(fcn))))
+            }
+
+            Expr::Get { object, property, .. } => {
+                let object = self.evaluate(object)?;
+                match object {
+                    Value::Instance(instance) => {
+                        if let Some(value) = instance.borrow().get(property) {
+                            Ok(value.clone())
+                        } else {
+                            Err(Error::runtime_error(format!("Undefined property '{}'.", property)))
+                        }
+                    }
+                    _ => {
+                        Err(Error::runtime_error("Only instances have properties."))
+                    }
+                }
+            }
+
+            Expr::Set { object, property, value, .. } => {
+                let object = self.evaluate(object)?;
+                let value = self.evaluate(value)?;
+                match object {
+                    Value::Instance(instance) => {
+                        instance.borrow_mut().set(property, value.clone());
+                        Ok(value)
+                    }
+                    _ => {
+                        Err(Error::runtime_error("Only instances have fields."))
+                    }
+                }
             }
 
             _ => Err(Error::runtime_error("Unexpected expression.")),
