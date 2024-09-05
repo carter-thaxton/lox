@@ -123,7 +123,7 @@ impl Interpreter {
                 let left = self.evaluate(left)?;
                 let right = self.evaluate(right)?;
 
-                let equal = compare_values(&left, &right);
+                let equal = left == right;
                 Ok(equal.into())
             }
 
@@ -131,7 +131,7 @@ impl Interpreter {
                 let left = self.evaluate(left)?;
                 let right = self.evaluate(right)?;
 
-                let equal = compare_values(&left, &right);
+                let equal = left == right;
                 Ok((!equal).into())
             }
 

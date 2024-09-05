@@ -243,17 +243,6 @@ impl Value {
     }
 }
 
-pub fn compare_values(left: &Value, right: &Value) -> bool {
-    match (left, right) {
-        (Value::Nil, Value::Nil) => true,
-        (Value::True, Value::True) => true,
-        (Value::False, Value::False) => true,
-        (Value::Number(left), Value::Number(right)) => left == right,
-        (Value::String(left), Value::String(right)) => left == right,
-        _ => false,
-    }
-}
-
 #[derive(Clone)]
 pub struct Environment {
     values: Vec<Value>,
