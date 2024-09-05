@@ -5,18 +5,12 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::rc::Rc;
 
-#[derive(Clone)]
 pub struct FunctionDecl {
     pub name: Option<String>,
     pub params: Vec<String>,
     pub body: Vec<Stmt>,
     pub line: usize,
-}
-
-impl PartialEq for FunctionDecl {
-    fn eq(&self, other: &FunctionDecl) -> bool {
-        self.name == other.name && self.params == other.params && self.body == other.body && self.line == other.line
-    }
+    pub is_init: bool,
 }
 
 impl Display for FunctionDecl {
@@ -49,12 +43,13 @@ impl Debug for Function {
 }
 
 impl Function {
-    pub fn new(name: Option<String>, params: &[(String, usize)], body: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
+    pub fn new(name: Option<String>, params: &[(String, usize)], body: &[Stmt], line: usize, is_init: bool, env: &Rc<RefCell<Environment>>) -> Self {
         let declaration = FunctionDecl {
-            name: name,
+            name,
             params: params.iter().map(|p| p.0.clone()).collect(),
             body: body.to_vec(),
-            line: line,
+            line,
+            is_init,
         };
 
         Function {
@@ -65,11 +60,15 @@ impl Function {
 
     pub fn bind(&self, instance: Instance) -> Function {
         let mut env = Environment::new(Rc::clone(&self.closure));
-        env.define("this", Value::Instance(instance));
+        env.define("this", Value::Instance(instance));  // always at index 0 in new environment
         Function {
             declaration: self.declaration.clone(),
             closure: Rc::new(RefCell::new(env)),
         }
+    }
+
+    pub fn arity(&self) -> usize {
+        self.declaration.params.len()
     }
 }
 
@@ -124,7 +123,8 @@ impl Class {
         for method in methods {
             match method {
                 Stmt::Function { name, params, body, line } => {
-                    let fcn = Function::new(Some(name.to_string()), &params, &body, *line, env);
+                    let is_init = name == "init";  // detect constructor method
+                    let fcn = Function::new(Some(name.to_string()), &params, &body, *line, is_init, env);
                     methods_map.insert(name.to_string(), fcn);
                 }
                 _ => {
@@ -142,6 +142,14 @@ impl Class {
 
     pub fn find_method(&self, name: &str) -> Option<Function> {
         self.methods.get(name).cloned()
+    }
+
+    pub fn init_arity(&self) -> usize {
+        if let Some(init) = self.methods.get("init") {
+            init.arity()
+        } else {
+            0
+        }
     }
 }
 
@@ -177,9 +185,9 @@ impl Display for Callable {
 impl Callable {
     pub fn arity(&self) -> usize {
         match self {
-            Callable::Function(f) => f.declaration.params.len(),
+            Callable::Function(f) => f.arity(),
             Callable::Builtin(f) => f.arity,
-            Callable::Class(_c) => 0, // TODO: support constructors
+            Callable::Class(c) => c.init_arity(),
         }
     }
 }

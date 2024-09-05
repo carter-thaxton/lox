@@ -6,9 +6,11 @@ use std::collections::VecDeque;
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum FunctionKind {
     Function,
     Method,
+    Constructor,
 }
 
 impl Display for FunctionKind {
@@ -16,6 +18,7 @@ impl Display for FunctionKind {
         match self {
             FunctionKind::Function => write!(f, "function"),
             FunctionKind::Method => write!(f, "method"),
+            FunctionKind::Constructor => write!(f, "constructor"),
         }
     }
 }
@@ -49,7 +52,7 @@ impl<'a> Parser<'a> {
 
         // first pass - parse
         while !self.at_eof() {
-            let stmt = self.parse_declaration(false, None)?;
+            let stmt = self.parse_declaration(None, None)?;
             program.push(stmt);
         }
 
@@ -72,7 +75,7 @@ impl<'a> Parser<'a> {
     // statements
     //
 
-    fn parse_declaration(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
+    fn parse_declaration(&mut self, in_function: Option<FunctionKind>, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
         // between each statement, handle any test statements parsed from comments
         self.advance_over_test_comments();
         if let Some(stmt) = self.test_stmts.pop_front() {
@@ -135,7 +138,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error> {
+    fn parse_fun_decl(&mut self, mut kind: FunctionKind) -> Result<Stmt, Error> {
         let (name, _tok) = self.consume_identifier(format!("Expect {} name.", kind))?;
         let lparen = self.consume(TokenKind::LeftParen, format!("Expect '(' after {} name.", kind))?;
         let line = lparen.span.line; // use line number of opening parenthesis
@@ -157,7 +160,12 @@ impl<'a> Parser<'a> {
         self.consume(TokenKind::RightParen, "Expect ')' after parameters.")?;
         self.consume(TokenKind::LeftBrace, format!("Expect '{{' before {} body.", kind))?;
 
-        let body = self.parse_block(true, None)?;
+        // detect specially-named 'init' method, and parse block as constructor
+        if kind == FunctionKind::Method && name == "init" {
+            kind = FunctionKind::Constructor;
+        }
+
+        let body = self.parse_block(Some(kind), None)?;
 
         return Ok(Stmt::Function {
             name: name.to_string(),
@@ -167,7 +175,7 @@ impl<'a> Parser<'a> {
         });
     }
 
-    fn parse_stmt(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
+    fn parse_stmt(&mut self, in_function: Option<FunctionKind>, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
         // between each statement, handle any test statements parsed from comments
         self.advance_over_test_comments();
         if let Some(stmt) = self.test_stmts.pop_front() {
@@ -302,14 +310,22 @@ impl<'a> Parser<'a> {
 
         // return ( <expr> )? ;
         if let Some(tok) = self.matches(TokenKind::Return) {
-            if !in_function {
-                return Err(Error::parser_error(tok.span, "Can't return from top-level code."));
-            }
             let expr = if !self.check(TokenKind::Semicolon) {
                 Some(Box::new(self.parse_expr()?))
             } else {
                 None
             };
+
+            match (&in_function, &expr) {
+                (None, _) => {
+                    return Err(Error::parser_error(tok.span, "Can't return from top-level code."));
+                }
+                (Some(FunctionKind::Constructor), Some(_)) => {
+                    return Err(Error::parser_error(tok.span, "Can't return a value from an initializer."));
+                }
+                _ => {}
+            }
+
             self.consume(TokenKind::Semicolon, "Expect ';' after return value.")?;
             return Ok(Stmt::Return(expr));
         }
@@ -349,7 +365,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expr(Box::new(expr)))
     }
 
-    fn parse_block(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Vec<Stmt>, Error> {
+    fn parse_block(&mut self, in_function: Option<FunctionKind>, in_loop: Option<LoopContext>) -> Result<Vec<Stmt>, Error> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
             self.advance_over_test_comments();
@@ -680,7 +696,7 @@ impl<'a> Parser<'a> {
         self.consume(TokenKind::RightParen, "Expect ')' after parameters.")?;
         self.consume(TokenKind::LeftBrace, format!("Expect '{{' before function body."))?;
 
-        let body = self.parse_block(true, None)?;
+        let body = self.parse_block(Some(FunctionKind::Function), None)?;
 
         return Ok(Expr::Function { params, body, line });
     }

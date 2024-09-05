@@ -183,7 +183,7 @@ impl Interpreter {
             }
 
             Expr::Function { params, body, line } => {
-                let fcn = Function::new(None, params, body, *line, &self.env);
+                let fcn = Function::new(None, params, body, *line, false, &self.env);
                 let fcn_val = Value::Callable(Callable::Function(fcn));
                 Ok(fcn_val)
             }
@@ -216,6 +216,7 @@ impl Interpreter {
 
             Expr::This { depth_and_index, .. } => {
                 if let Some((depth, index)) = depth_and_index {
+                    assert_eq!(*index, 0, "'this' should always have index 0.");
                     if let Some(val) = self.env.borrow().get_at(*depth, *index) {
                         Ok(val.clone())
                     } else {
@@ -261,8 +262,17 @@ impl Interpreter {
                             kind: ErrorKind::ReturnValue(value),
                             ..
                         }) => {
-                            self.env = orig_env;
-                            return Ok(value);
+                            if f.declaration.is_init {
+                                if value != Value::Nil {
+                                    panic!("Can't return a value from an initializer.  This should be checked at compile-time.");
+                                } else {
+                                    // early return in constructor, return 'this' instead below
+                                    break;
+                                }
+                            } else {
+                                self.env = orig_env;
+                                return Ok(value);
+                            }
                         }
                         Err(err) => {
                             self.env = orig_env;
@@ -273,14 +283,29 @@ impl Interpreter {
                 }
 
                 self.env = orig_env;
-                Ok(Value::Nil)
+
+                if f.declaration.is_init {
+                    // always return 'this' from constructors
+                    let this = f.closure.borrow().get_at(0, 0).expect("'this' not found in environment of initializer.");
+                    assert!(matches!(this, Value::Instance(_)), "'this' should refer to an instance - got: {}", this);
+                    Ok(this)
+                } else {
+                    Ok(Value::Nil)
+                }
             }
 
             Callable::Builtin(f) => f.call(args),
 
             Callable::Class(class) => {
-                let instance = Instance::new(class);
-                Ok(Value::Instance(instance))
+                if let Some(init) = class.find_method("init") {
+                    let instance = Instance::new(class);
+                    let init = init.bind(instance.clone());
+                    self.call(Value::Callable(Callable::Function(init)), args)?;
+                    Ok(Value::Instance(instance))
+                } else {
+                    let instance = Instance::new(class);
+                    Ok(Value::Instance(instance))
+                }
             }
         }
     }
@@ -369,7 +394,7 @@ impl Interpreter {
             }
 
             Stmt::Function { name, params, body, line } => {
-                let fcn = Function::new(Some(name.to_string()), params, body, *line, &self.env);
+                let fcn = Function::new(Some(name.to_string()), params, body, *line, false, &self.env);
                 let fcn_val = Value::Callable(Callable::Function(fcn));
 
                 self.env.borrow_mut().define(name, fcn_val);
