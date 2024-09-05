@@ -149,17 +149,10 @@ impl Display for Expr {
                 }
                 write!(f, "))")
             }
-            Expr::Get {
-                object, property, ..
-            } => {
+            Expr::Get { object, property, .. } => {
                 write!(f, "(get {}.{})", object, property)
             }
-            Expr::Set {
-                object,
-                property,
-                value,
-                ..
-            } => {
+            Expr::Set { object, property, value, .. } => {
                 write!(f, "(set {}.{} = {})", object, property, value)
             }
         }

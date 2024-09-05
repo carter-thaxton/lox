@@ -19,11 +19,7 @@ pub struct ErrorSpan {
 
 impl ErrorSpan {
     fn dummy_for_line(line: usize) -> Self {
-        ErrorSpan {
-            line,
-            col: 0,
-            lexeme: None,
-        }
+        ErrorSpan { line, col: 0, lexeme: None }
     }
 
     fn dummy_for_line_at_token(line: usize, token: impl Into<String>) -> Self {
@@ -67,13 +63,7 @@ pub enum ErrorKind {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         if let Some(span) = &self.span {
-            write!(
-                f,
-                "[line {}] Error{}: {}",
-                span.line,
-                self.at_message(),
-                self.kind
-            )
+            write!(f, "[line {}] Error{}: {}", span.line, self.at_message(), self.kind)
         } else {
             write!(f, "{}", self.kind)
         }
@@ -107,21 +97,10 @@ impl Display for ErrorKind {
                 write!(f, "{}: Expected runtime error: {}", "FAIL".red(), msg)
             }
             ErrorKind::TestOutputMismatch(expected, actual) => {
-                write!(
-                    f,
-                    "{}: Expected output: {} - got: {}",
-                    "FAIL".red(),
-                    expected,
-                    actual
-                )
+                write!(f, "{}: Expected output: {} - got: {}", "FAIL".red(), expected, actual)
             }
             ErrorKind::TestOutputMissing(expected) => {
-                write!(
-                    f,
-                    "{}: Expected output: {} - got nothing",
-                    "FAIL".red(),
-                    expected
-                )
+                write!(f, "{}: Expected output: {} - got nothing", "FAIL".red(), expected)
             }
             ErrorKind::TestOutputUnexpected(actual) => {
                 write!(f, "{}: Unexpected output: {}", "FAIL".red(), actual)
@@ -178,11 +157,7 @@ impl Error {
         }
     }
 
-    pub fn parser_error_on_line_at_token(
-        line: usize,
-        token: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
+    pub fn parser_error_on_line_at_token(line: usize, token: impl Into<String>, message: impl Into<String>) -> Self {
         Error {
             kind: ErrorKind::ParserError(message.into()),
             span: Some(ErrorSpan::dummy_for_line_at_token(line, token)),
@@ -271,9 +246,7 @@ impl Error {
 
     fn at_message(&self) -> Cow<str> {
         let span: &ErrorSpan = match &self.kind {
-            ErrorKind::ParserError(_) => {
-                &self.span.as_ref().expect("ParserError should have a span")
-            }
+            ErrorKind::ParserError(_) => &self.span.as_ref().expect("ParserError should have a span"),
             _ => {
                 return "".into();
             }

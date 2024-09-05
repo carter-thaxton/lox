@@ -193,12 +193,7 @@ fn test(input: &str) {
                             println!("{}: expect runtime error: {}", "PASS".green(), actual);
                         } else {
                             let expected = &expected_runtime_errors[0];
-                            println!(
-                                "{}: Expected runtime error: {} - got: {}",
-                                "FAIL".red(),
-                                expected,
-                                actual
-                            );
+                            println!("{}: Expected runtime error: {} - got: {}", "FAIL".red(), expected, actual);
                             std::process::exit(EX_CONFIG);
                         }
                     }
@@ -217,12 +212,7 @@ fn test(input: &str) {
                     println!("{}: expect parser error: {}", "PASS".green(), actual);
                 } else {
                     let expected = &expected_parser_errors[0];
-                    println!(
-                        "{}: Expected parser error: {} - got: {}",
-                        "FAIL".red(),
-                        expected,
-                        actual
-                    );
+                    println!("{}: Expected parser error: {} - got: {}", "FAIL".red(), expected, actual);
                     std::process::exit(EX_CONFIG);
                 }
             }

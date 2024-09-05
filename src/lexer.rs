@@ -70,13 +70,7 @@ pub enum TokenKind<'a> {
 
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "{} {} {}",
-            self.kind.name(),
-            self.span.lexeme,
-            self.kind.value()
-        )
+        write!(f, "{} {} {}", self.kind.name(), self.span.lexeme, self.kind.value())
     }
 }
 
@@ -176,12 +170,10 @@ impl<'a> Lexer<'a> {
             rest: input,
             line: 1,
             col: 0,
-
             lexeme_start: input,
             lexeme_line: 0,
             lexeme_col: 0,
             lexeme_len: 0,
-
             enable_test_comments,
         }
     }
@@ -317,9 +309,7 @@ impl<'a> Iterator for Lexer<'a> {
                             let comment = span.lexeme.trim();
                             if let Some(txt) = comment.strip_prefix("// expect: ") {
                                 (TokenKind::ExpectOutput(txt), span)
-                            } else if let Some(txt) =
-                                comment.strip_prefix("// expect runtime error: ")
-                            {
+                            } else if let Some(txt) = comment.strip_prefix("// expect runtime error: ") {
                                 (TokenKind::ExpectRuntimeError(txt), span)
                             } else if comment.starts_with("// Error") {
                                 // Error at ...
@@ -327,8 +317,7 @@ impl<'a> Iterator for Lexer<'a> {
                                 let txt = comment.strip_prefix("// ").unwrap();
                                 let txt = format!("[line {}] {}", span.line, txt);
                                 (TokenKind::ExpectParserError(txt.into()), span)
-                            } else if comment.starts_with("// [line ") && comment.contains(" Error")
-                            {
+                            } else if comment.starts_with("// [line ") && comment.contains(" Error") {
                                 // [line 2] Error at ...
                                 // error message already includes line number
                                 let txt = comment.strip_prefix("// ").unwrap();
@@ -366,8 +355,7 @@ impl<'a> Iterator for Lexer<'a> {
                         self.advance();
                     }
 
-                    if self.peek() == Some('.') && self.peek_next().is_some_and(|c| c.is_digit(10))
-                    {
+                    if self.peek() == Some('.') && self.peek_next().is_some_and(|c| c.is_digit(10)) {
                         self.advance(); // dot
 
                         while let Some(c) = self.peek() {

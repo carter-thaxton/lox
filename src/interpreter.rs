@@ -45,11 +45,7 @@ impl Interpreter {
 
             Expr::Group(expr) => self.evaluate(expr),
 
-            Expr::Variable {
-                name,
-                depth_and_index,
-                ..
-            } => {
+            Expr::Variable { name, depth_and_index, .. } => {
                 if let Some((depth, index)) = depth_and_index {
                     if let Some(val) = self.env.borrow().get_at(*depth, *index) {
                         Ok(val.clone())
@@ -60,10 +56,7 @@ impl Interpreter {
                     // may be a global variable, according to lox rules
                     Ok(val.clone())
                 } else {
-                    Err(Error::runtime_error(format!(
-                        "Undefined variable '{}'.",
-                        name
-                    )))
+                    Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
                 }
             }
 
@@ -77,29 +70,17 @@ impl Interpreter {
                 Ok(Value::Number(-right))
             }
 
-            Expr::BinaryExpr {
-                op: Op::Mul,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Mul, left, right } => {
                 let (left, right) = self.evaluate_to_numbers(left, right)?;
                 Ok(Value::Number(left * right))
             }
 
-            Expr::BinaryExpr {
-                op: Op::Div,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Div, left, right } => {
                 let (left, right) = self.evaluate_to_numbers(left, right)?;
                 Ok(Value::Number(left / right))
             }
 
-            Expr::BinaryExpr {
-                op: Op::Add,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Add, left, right } => {
                 let left = self.evaluate(left)?;
                 let right = self.evaluate(right)?;
                 match (left, right) {
@@ -109,62 +90,36 @@ impl Interpreter {
                         result.push_str(&right);
                         Ok(Value::String(result))
                     }
-                    _ => Err(Error::runtime_error(
-                        "Operands must be two numbers or two strings.",
-                    )),
+                    _ => Err(Error::runtime_error("Operands must be two numbers or two strings.")),
                 }
             }
 
-            Expr::BinaryExpr {
-                op: Op::Sub,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Sub, left, right } => {
                 let (left, right) = self.evaluate_to_numbers(left, right)?;
                 Ok(Value::Number(left - right))
             }
 
-            Expr::BinaryExpr {
-                op: Op::Lt,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Lt, left, right } => {
                 let (left, right) = self.evaluate_to_numbers(left, right)?;
                 Ok((left < right).into())
             }
 
-            Expr::BinaryExpr {
-                op: Op::Le,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Le, left, right } => {
                 let (left, right) = self.evaluate_to_numbers(left, right)?;
                 Ok((left <= right).into())
             }
 
-            Expr::BinaryExpr {
-                op: Op::Gt,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Gt, left, right } => {
                 let (left, right) = self.evaluate_to_numbers(left, right)?;
                 Ok((left > right).into())
             }
 
-            Expr::BinaryExpr {
-                op: Op::Ge,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Ge, left, right } => {
                 let (left, right) = self.evaluate_to_numbers(left, right)?;
                 Ok((left >= right).into())
             }
 
-            Expr::BinaryExpr {
-                op: Op::Eq,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Eq, left, right } => {
                 let left = self.evaluate(left)?;
                 let right = self.evaluate(right)?;
 
@@ -172,11 +127,7 @@ impl Interpreter {
                 Ok(equal.into())
             }
 
-            Expr::BinaryExpr {
-                op: Op::Ne,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Ne, left, right } => {
                 let left = self.evaluate(left)?;
                 let right = self.evaluate(right)?;
 
@@ -184,11 +135,7 @@ impl Interpreter {
                 Ok((!equal).into())
             }
 
-            Expr::BinaryExpr {
-                op: Op::And,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::And, left, right } => {
                 let left = self.evaluate(left)?;
                 if left.is_truthy() {
                     // short-circuit and: only evaluate right when left is truthy
@@ -199,11 +146,7 @@ impl Interpreter {
                 }
             }
 
-            Expr::BinaryExpr {
-                op: Op::Or,
-                left,
-                right,
-            } => {
+            Expr::BinaryExpr { op: Op::Or, left, right } => {
                 let left = self.evaluate(left)?;
                 if !left.is_truthy() {
                     // short-circuit or: only evaluate right when left is falsey
@@ -222,27 +165,19 @@ impl Interpreter {
             } => {
                 let right = self.evaluate(right)?;
                 if let Some((depth, index)) = depth_and_index {
-                    if self
-                        .env
-                        .borrow_mut()
-                        .assign_at(*depth, *index, right.clone())
-                    {
+                    if self.env.borrow_mut().assign_at(*depth, *index, right.clone()) {
                         Ok(right)
                     } else {
                         panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
                     }
                 } else {
-                    Err(Error::runtime_error(format!(
-                        "Undefined variable '{}'.",
-                        name
-                    )))
+                    Err(Error::runtime_error(format!("Undefined variable '{}'.", name)))
                 }
             }
 
             Expr::Call { callee, args, .. } => {
                 let callee = self.evaluate(callee)?;
-                let args: Result<Vec<Value>, Error> =
-                    args.into_iter().map(|arg| self.evaluate(arg)).collect();
+                let args: Result<Vec<Value>, Error> = args.into_iter().map(|arg| self.evaluate(arg)).collect();
                 let args = args?;
                 return self.call(callee, &args);
             }
@@ -346,11 +281,7 @@ impl Interpreter {
             }
 
             Stmt::Var { name, init, .. } => {
-                let val = if let Some(expr) = init {
-                    self.evaluate(expr)?
-                } else {
-                    Value::Nil
-                };
+                let val = if let Some(expr) = init { self.evaluate(expr)? } else { Value::Nil };
                 self.env.borrow_mut().define(name, val);
             }
 
@@ -386,8 +317,7 @@ impl Interpreter {
                     // handle break and continue statements, implemented as special errors
                     match result {
                         Err(Error {
-                            kind: ErrorKind::BreakLoop,
-                            ..
+                            kind: ErrorKind::BreakLoop, ..
                         }) => {
                             return Ok(());
                         }
@@ -403,12 +333,7 @@ impl Interpreter {
                 }
             }
 
-            Stmt::Function {
-                name,
-                params,
-                body,
-                line,
-            } => {
+            Stmt::Function { name, params, body, line } => {
                 let fcn = Function {
                     name: Some(name.to_string()),
                     params: params.iter().map(|p| p.0.clone()).collect(),
@@ -422,11 +347,7 @@ impl Interpreter {
                 self.env.borrow_mut().define(name, fcn_val);
             }
 
-            Stmt::Class {
-                name,
-                methods,
-                line,
-            } => {
+            Stmt::Class { name, methods, line } => {
                 let class = Class {
                     name: name.to_string(),
                     methods: methods.to_vec(),
@@ -439,11 +360,7 @@ impl Interpreter {
             }
 
             Stmt::Return(expr) => {
-                let val = if let Some(expr) = expr {
-                    self.evaluate(expr)?
-                } else {
-                    Value::Nil
-                };
+                let val = if let Some(expr) = expr { self.evaluate(expr)? } else { Value::Nil };
 
                 return Err(Error::return_value(val));
             }

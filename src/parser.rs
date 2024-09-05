@@ -64,11 +64,7 @@ impl<'a> Parser<'a> {
     // statements
     //
 
-    fn parse_declaration(
-        &mut self,
-        in_function: bool,
-        in_loop: Option<LoopContext>,
-    ) -> Result<Stmt, Error> {
+    fn parse_declaration(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
         if let Some(stmt) = self.parse_test_comments() {
             return Ok(stmt);
         }
@@ -101,10 +97,7 @@ impl<'a> Parser<'a> {
         // fun <name> ( (<arg>, )* ) { <body> }
         // explicitly look ahead two tokens, for 'fun <name>', to allow for anonymous 'fun' expressions
         if self.check2_p(|t1, t2| *t1 == TokenKind::Fun && matches!(t2, TokenKind::Identifier(_))) {
-            self.consume(
-                TokenKind::Fun,
-                "Expect 'fun' to begin function declaration.",
-            )?;
+            self.consume(TokenKind::Fun, "Expect 'fun' to begin function declaration.")?;
             return self.parse_fun_decl(FunctionKind::Function);
         }
 
@@ -134,10 +127,7 @@ impl<'a> Parser<'a> {
 
     fn parse_fun_decl(&mut self, kind: FunctionKind) -> Result<Stmt, Error> {
         let (name, _tok) = self.consume_identifier(format!("Expect {} name.", kind))?;
-        let lparen = self.consume(
-            TokenKind::LeftParen,
-            format!("Expect '(' after {} name.", kind),
-        )?;
+        let lparen = self.consume(TokenKind::LeftParen, format!("Expect '(' after {} name.", kind))?;
         let line = lparen.span.line; // use line number of opening parenthesis
 
         let mut params: Vec<(String, usize)> = vec![];
@@ -155,10 +145,7 @@ impl<'a> Parser<'a> {
         }
 
         self.consume(TokenKind::RightParen, "Expect ')' after parameters.")?;
-        self.consume(
-            TokenKind::LeftBrace,
-            format!("Expect '{{' before {} body.", kind),
-        )?;
+        self.consume(TokenKind::LeftBrace, format!("Expect '{{' before {} body.", kind))?;
 
         let body = self.parse_block(true, None)?;
 
@@ -170,11 +157,7 @@ impl<'a> Parser<'a> {
         });
     }
 
-    fn parse_stmt(
-        &mut self,
-        in_function: bool,
-        in_loop: Option<LoopContext>,
-    ) -> Result<Stmt, Error> {
+    fn parse_stmt(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
         // ;
         while self.matches(TokenKind::Semicolon).is_some() {
             // simply ignore empty statement
@@ -254,9 +237,7 @@ impl<'a> Parser<'a> {
 
             // parse body, with an implied post-increment expression, which should be
             // inserted before any 'continue' statements in the loop.
-            let loop_context = LoopContext {
-                post_incr: incr.as_ref(),
-            };
+            let loop_context = LoopContext { post_incr: incr.as_ref() };
             let body = self.parse_stmt(in_function, Some(loop_context))?;
 
             // desugar to while-loop:
@@ -306,10 +287,7 @@ impl<'a> Parser<'a> {
         // return ( <expr> )? ;
         if let Some(tok) = self.matches(TokenKind::Return) {
             if !in_function {
-                return Err(Error::parser_error(
-                    tok.span,
-                    "Can't return from top-level code.",
-                ));
+                return Err(Error::parser_error(tok.span, "Can't return from top-level code."));
             }
             let expr = if !self.check(TokenKind::Semicolon) {
                 Some(Box::new(self.parse_expr()?))
@@ -341,10 +319,7 @@ impl<'a> Parser<'a> {
                     return Ok(Stmt::Continue);
                 }
             } else {
-                return Err(Error::parser_error(
-                    tok.span,
-                    "Can only continue within loop.",
-                ));
+                return Err(Error::parser_error(tok.span, "Can only continue within loop."));
             }
         }
 
@@ -358,11 +333,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expr(Box::new(expr)))
     }
 
-    fn parse_block(
-        &mut self,
-        in_function: bool,
-        in_loop: Option<LoopContext>,
-    ) -> Result<Vec<Stmt>, Error> {
+    fn parse_block(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Vec<Stmt>, Error> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
             if let Some(stmt) = self.parse_test_comments() {
@@ -385,16 +356,12 @@ impl<'a> Parser<'a> {
         while let Some(tok) = self.matches_p(|t| {
             matches!(
                 t,
-                TokenKind::ExpectOutput(_)
-                    | TokenKind::ExpectParserError(_)
-                    | TokenKind::ExpectRuntimeError(_)
+                TokenKind::ExpectOutput(_) | TokenKind::ExpectParserError(_) | TokenKind::ExpectRuntimeError(_)
             )
         }) {
             match tok.kind {
                 TokenKind::ExpectOutput(txt) => return Some(Stmt::ExpectOutput(txt.to_string())),
-                TokenKind::ExpectRuntimeError(msg) => {
-                    return Some(Stmt::ExpectRuntimeError(msg.to_string()))
-                }
+                TokenKind::ExpectRuntimeError(msg) => return Some(Stmt::ExpectRuntimeError(msg.to_string())),
                 TokenKind::ExpectParserError(_msg) => {
                     // ignore this while parsing...
                     continue;
@@ -427,10 +394,7 @@ impl<'a> Parser<'a> {
                     line: tok.span.line,
                     depth_and_index: None,
                 });
-            } else if let Expr::Get {
-                object, property, ..
-            } = left
-            {
+            } else if let Expr::Get { object, property, .. } = left {
                 // <left> is a get expressions, e.g. x.y = val;
                 let value = self.parse_assignment()?;
                 return Ok(Expr::Set {
@@ -505,12 +469,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_term()?;
 
         // <left> < <right> | <left> <= <right> | <left> > <right> | <left> >= <right>
-        while let Some(tok) = self.matches_n(&[
-            TokenKind::Less,
-            TokenKind::LessEqual,
-            TokenKind::Greater,
-            TokenKind::GreaterEqual,
-        ]) {
+        while let Some(tok) = self.matches_n(&[TokenKind::Less, TokenKind::LessEqual, TokenKind::Greater, TokenKind::GreaterEqual]) {
             let op = match tok.kind {
                 TokenKind::Less => Op::Lt,
                 TokenKind::LessEqual => Op::Le,
@@ -612,8 +571,7 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                let closing_paren =
-                    self.consume(TokenKind::RightParen, "Expect ')' after arguments.")?;
+                let closing_paren = self.consume(TokenKind::RightParen, "Expect ')' after arguments.")?;
 
                 left = Expr::Call {
                     callee: Box::new(left),
@@ -656,9 +614,7 @@ impl<'a> Parser<'a> {
         // "<str>"
         if let Some(tok) = self.matches_p(|t| matches!(t, TokenKind::String(_))) {
             match tok.kind {
-                TokenKind::String(val) => {
-                    return Ok(Expr::Literal(Literal::String(val.to_string())))
-                }
+                TokenKind::String(val) => return Ok(Expr::Literal(Literal::String(val.to_string()))),
                 _ => unreachable!(),
             }
         }
@@ -718,10 +674,7 @@ impl<'a> Parser<'a> {
         }
 
         self.consume(TokenKind::RightParen, "Expect ')' after parameters.")?;
-        self.consume(
-            TokenKind::LeftBrace,
-            format!("Expect '{{' before function body."),
-        )?;
+        self.consume(TokenKind::LeftBrace, format!("Expect '{{' before function body."))?;
 
         let body = self.parse_block(true, None)?;
 
@@ -753,9 +706,7 @@ impl<'a> Parser<'a> {
                 Some(Ok(token)) if !token.kind.is_test() => {
                     return Some(token.span.into());
                 }
-                Some(Err(Error {
-                    span: Some(span), ..
-                })) => {
+                Some(Err(Error { span: Some(span), .. })) => {
                     return Some(span);
                 }
                 _ => {
@@ -819,11 +770,7 @@ impl<'a> Parser<'a> {
     }
 
     // like matches, but produces a parser error if it doesn't match
-    fn consume(
-        &mut self,
-        token: TokenKind<'a>,
-        message: impl Into<String>,
-    ) -> Result<Token<'a>, Error> {
+    fn consume(&mut self, token: TokenKind<'a>, message: impl Into<String>) -> Result<Token<'a>, Error> {
         if self.check(token) {
             Ok(self.advance())
         } else {
@@ -903,10 +850,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn consume_identifier(
-        &mut self,
-        message: impl Into<String>,
-    ) -> Result<(&'a str, Token<'a>), Error> {
+    fn consume_identifier(&mut self, message: impl Into<String>) -> Result<(&'a str, Token<'a>), Error> {
         if let Some((name, tok)) = self.matches_identifier() {
             Ok((name, tok))
         } else {

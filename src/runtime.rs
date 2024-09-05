@@ -16,10 +16,7 @@ pub struct Function {
 
 impl PartialEq for Function {
     fn eq(&self, other: &Function) -> bool {
-        self.name == other.name
-            && self.params == other.params
-            && self.body == other.body
-            && self.line == other.line
+        self.name == other.name && self.params == other.params && self.body == other.body && self.line == other.line
     }
 }
 
@@ -228,11 +225,7 @@ impl Value {
         }
     }
 
-    pub fn builtin_fn(
-        name: impl Into<String>,
-        arity: usize,
-        fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
-    ) -> Value {
+    pub fn builtin_fn(name: impl Into<String>, arity: usize, fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>) -> Value {
         let fcn = BuiltinFunction {
             name: name.into(),
             arity,

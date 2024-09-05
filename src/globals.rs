@@ -12,11 +12,7 @@ pub fn global_names() -> Vec<&'static str> {
 pub fn define_globals(env: &mut Environment) {
     // built-in globals
     let start_time = Instant::now();
-    let clock_fn = Value::builtin_fn(
-        "clock",
-        0,
-        Box::new(move |_| Ok(Value::Number(clock(&start_time)))),
-    );
+    let clock_fn = Value::builtin_fn("clock", 0, Box::new(move |_| Ok(Value::Number(clock(&start_time)))));
 
     env.define("clock", clock_fn);
 }

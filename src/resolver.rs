@@ -118,21 +118,12 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
             }
             scopes.define(name);
         }
-        Stmt::Function {
-            name,
-            params,
-            body,
-            line,
-        } => {
+        Stmt::Function { name, params, body, line } => {
             scopes.declare_and_check(name, *line)?;
             scopes.define(name);
             resolve_function(params, body, scopes)?;
         }
-        Stmt::Class {
-            name,
-            methods: _,
-            line,
-        } => {
+        Stmt::Class { name, methods: _, line } => {
             scopes.declare_and_check(name, *line)?;
             // TODO: resolve methods
         }
@@ -187,15 +178,9 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
 fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), Error> {
     match expr {
         // these are the juicy cases
-        Expr::Variable {
-            name,
-            line,
-            depth_and_index,
-        } => {
+        Expr::Variable { name, line, depth_and_index } => {
             let name: &str = name;
-            if matches!(scopes.current_scope().get(name), Some((_, false)))
-                && !scopes.is_global(name)
-            {
+            if matches!(scopes.current_scope().get(name), Some((_, false))) && !scopes.is_global(name) {
                 return Err(Error::parser_error_on_line_at_token(
                     *line,
                     name.to_string(),
@@ -258,11 +243,7 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
     Ok(())
 }
 
-fn resolve_function<'a>(
-    params: &'a [(String, usize)],
-    body: &'a mut [Stmt],
-    scopes: &mut Scopes<'a>,
-) -> Result<(), Error> {
+fn resolve_function<'a>(params: &'a [(String, usize)], body: &'a mut [Stmt], scopes: &mut Scopes<'a>) -> Result<(), Error> {
     // be sure to pop this before exiting
     scopes.push();
     // defer! {
