@@ -126,6 +126,7 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
         }
         Stmt::Class { name, methods, line } => {
             scopes.declare_and_check(name, *line)?;
+            scopes.define(name);
 
             scopes.push();
             scopes.declare("this");
