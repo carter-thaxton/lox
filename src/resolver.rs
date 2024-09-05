@@ -245,24 +245,21 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
 
 fn resolve_function<'a>(params: &'a [(String, usize)], body: &'a mut [Stmt], scopes: &mut Scopes<'a>) -> Result<(), Error> {
     // be sure to pop this before exiting
+    // better way to do a 'finally' or 'defer' in rust?
     scopes.push();
-    // defer! {
-    //     scopes.pop();
-    // }
 
     for (param, line) in params {
-        if !scopes.declare(param) {
-            return Err(Error::parser_error_on_line_at_token(
-                *line,
-                param,
-                "Already a variable with this name in this scope.",
-            ));
+        match scopes.declare_and_check(param, *line) {
+            Err(err) => {
+                scopes.pop();
+                return Err(err);
+            }
+            _ => {}
         }
         scopes.define(param);
     }
 
     for stmt in body {
-        // better way to do a 'finally' or 'defer' in rust?
         match resolve_stmt(stmt, scopes) {
             Err(err) => {
                 scopes.pop();
@@ -273,6 +270,5 @@ fn resolve_function<'a>(params: &'a [(String, usize)], body: &'a mut [Stmt], sco
     }
 
     scopes.pop();
-
     Ok(())
 }

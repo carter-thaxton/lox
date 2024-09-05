@@ -203,9 +203,7 @@ impl Interpreter {
                             Err(Error::runtime_error(format!("Undefined property '{}'.", property)))
                         }
                     }
-                    _ => {
-                        Err(Error::runtime_error("Only instances have properties."))
-                    }
+                    _ => Err(Error::runtime_error("Only instances have properties.")),
                 }
             }
 
@@ -217,9 +215,7 @@ impl Interpreter {
                         instance.borrow_mut().set(property, value.clone());
                         Ok(value)
                     }
-                    _ => {
-                        Err(Error::runtime_error("Only instances have fields."))
-                    }
+                    _ => Err(Error::runtime_error("Only instances have fields.")),
                 }
             }
 
