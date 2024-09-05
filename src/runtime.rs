@@ -50,15 +50,27 @@ impl Display for Function {
 }
 
 impl Function {
-    pub fn new(name: impl Into<String>, params: &[(String, usize)], body: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
+    pub fn new(name: Option<String>, params: &[(String, usize)], body: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
         Function {
-            name: Some(name.into()),
+            name: name,
             params: params.iter().map(|p| p.0.clone()).collect(),
             body: body.to_vec(),
             line: line,
             closure: Rc::clone(env),
         }
     }
+
+    // pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Function {
+    //     let mut env = Environment::new(Rc::clone(&self.closure));
+    //     env.define("this", Value::Instance(instance));
+    //     Function {
+    //         name: self.name.clone(),
+    //         params: self.params.clone(),
+    //         body: self.body.clone(),
+    //         line: self.line,
+    //         closure: Rc::new(env.into()),
+    //     }
+    // }
 }
 
 pub struct BuiltinFunction {
@@ -125,7 +137,7 @@ impl Class {
         for method in methods {
             match method {
                 Stmt::Function { name, params, body, line } => {
-                    let fcn = Function::new(name, &params, &body, *line, env);
+                    let fcn = Function::new(Some(name.to_string()), &params, &body, *line, env);
                     methods_map.insert(name.to_string(), Rc::new(fcn));
                 }
                 _ => {
@@ -203,6 +215,7 @@ impl Instance {
         if let Some(val) = self.fields.get(name) {
             Some(val.clone())
         } else if let Some(method) = self.class.find_method(name) {
+            // method.bind(self);
             Some(Value::Callable(Callable::Function(method)))
         } else {
             None

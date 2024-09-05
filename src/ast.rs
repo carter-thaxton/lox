@@ -85,6 +85,10 @@ pub enum Expr {
         value: Box<Expr>,
         line: usize,
     },
+    This {
+        line: usize,
+        depth_and_index: Option<(usize, usize)>,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -154,6 +158,9 @@ impl Display for Expr {
             }
             Expr::Set { object, property, value, .. } => {
                 write!(f, "(set {}.{} = {})", object, property, value)
+            }
+            Expr::This { .. } => {
+                write!(f, "(this)")
             }
         }
     }

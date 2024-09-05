@@ -183,14 +183,9 @@ impl Interpreter {
             }
 
             Expr::Function { params, body, line } => {
-                let fcn = Function {
-                    name: None,
-                    params: params.iter().map(|p| p.0.clone()).collect(),
-                    body: body.to_vec(),
-                    line: *line,
-                    closure: Rc::clone(&self.env),
-                };
-                Ok(Value::Callable(Callable::Function(Rc::new(fcn))))
+                let fcn = Function::new(None, params, body, *line, &self.env);
+                let fcn_val = Value::Callable(Callable::Function(Rc::new(fcn)));
+                Ok(fcn_val)
             }
 
             Expr::Get { object, property, .. } => {
@@ -239,7 +234,7 @@ impl Interpreter {
 
         match callee {
             Callable::Function(f) => {
-                let orig_env = self.enter(f.closure.clone());
+                let orig_env = self.enter(Rc::clone(&f.closure));
 
                 for (i, param) in f.params.iter().enumerate() {
                     self.env.borrow_mut().define(param, args[i].clone());
@@ -312,7 +307,7 @@ impl Interpreter {
             }
 
             Stmt::Block(stmts) => {
-                let orig_env = self.enter(self.env.clone());
+                let orig_env = self.enter(Rc::clone(&self.env));
                 for stmt in stmts {
                     let result = self.execute(stmt);
                     if result.is_err() {
@@ -360,14 +355,13 @@ impl Interpreter {
             }
 
             Stmt::Function { name, params, body, line } => {
-                let fcn = Function::new(name, params, body, *line, &self.env);
+                let fcn = Function::new(Some(name.to_string()), params, body, *line, &self.env);
                 let fcn_val = Value::Callable(Callable::Function(Rc::new(fcn)));
 
                 self.env.borrow_mut().define(name, fcn_val);
             }
 
             Stmt::Class { name, methods, line } => {
-                // TODO: introduce new scope / handle this?
                 let class = Class::new(name, methods, *line, &self.env);
                 let class_val = Value::Callable(Callable::Class(Rc::new(class)));
 

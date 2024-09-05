@@ -127,16 +127,27 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
         Stmt::Class { name, methods, line } => {
             scopes.declare_and_check(name, *line)?;
 
+            scopes.push();
+            scopes.declare("this");
+            scopes.define("this");
+
             for method in methods {
                 match method {
                     Stmt::Function { params, body, .. } => {
-                        resolve_function(FunctionKind::Method, params, body, scopes)?;
+                        match resolve_function(FunctionKind::Method, params, body, scopes) {
+                            Err(err) => {
+                                scopes.pop();
+                                return Err(err);
+                            }
+                            _ => {}
+                        }
                     }
                     _ => {
                         panic!("Stmt::Class methods may only contain Stmt::Functions");
                     }
                 }
             }
+            scopes.pop();
         }
 
         // below simply walks the AST
@@ -222,6 +233,13 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
         }
         Expr::Function { params, body, .. } => {
             resolve_function(FunctionKind::Function, params, body, scopes)?;
+        }
+        Expr::This { line, depth_and_index, .. } => {
+            if let Some((depth, index)) = scopes.depth_and_index_of("this") {
+                *depth_and_index = Some((depth, index));
+            } else {
+                return Err(Error::parser_error_on_line_at_token(*line, "this", "Can't use 'this' outside of a class."));
+            }
         }
 
         // below simply walks the AST
