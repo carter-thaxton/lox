@@ -6,40 +6,20 @@ use std::fmt::{Debug, Display, Formatter};
 use std::rc::Rc;
 
 #[derive(Clone)]
-pub struct Function {
+pub struct FunctionDecl {
     pub name: Option<String>,
     pub params: Vec<String>,
     pub body: Vec<Stmt>,
     pub line: usize,
-    pub closure: Rc<RefCell<Environment>>,
 }
 
-impl PartialEq for Function {
-    fn eq(&self, other: &Function) -> bool {
+impl PartialEq for FunctionDecl {
+    fn eq(&self, other: &FunctionDecl) -> bool {
         self.name == other.name && self.params == other.params && self.body == other.body && self.line == other.line
     }
 }
 
-impl Debug for Function {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        if let Some(name) = &self.name {
-            write!(f, "function {}(", name)?;
-        } else {
-            write!(f, "function (")?;
-        }
-        let mut first = true;
-        for param in &self.params {
-            if !first {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", param)?;
-            first = false;
-        }
-        write!(f, ")")
-    }
-}
-
-impl Display for Function {
+impl Display for FunctionDecl {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         if let Some(name) = &self.name {
             write!(f, "<fn {}>", name)
@@ -49,13 +29,36 @@ impl Display for Function {
     }
 }
 
+#[derive(Clone)]
+pub struct Function {
+    pub declaration: Rc<FunctionDecl>,
+    pub closure: Rc<RefCell<Environment>>,
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Function) -> bool {
+        // compare functions only by their declaration
+        self.declaration == other.declaration
+    }
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.declaration)
+    }
+}
+
 impl Function {
     pub fn new(name: Option<String>, params: &[(String, usize)], body: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
-        Function {
+        let declaration = FunctionDecl {
             name: name,
             params: params.iter().map(|p| p.0.clone()).collect(),
             body: body.to_vec(),
             line: line,
+        };
+
+        Function {
+            declaration: Rc::new(declaration),
             closure: Rc::clone(env),
         }
     }
@@ -85,19 +88,6 @@ impl PartialEq for BuiltinFunction {
     }
 }
 
-impl Debug for BuiltinFunction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "builtin function {}(", self.name)?;
-        for i in 0..self.arity {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "_")?;
-        }
-        write!(f, ")")
-    }
-}
-
 impl Display for BuiltinFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "<native fn>")
@@ -121,7 +111,7 @@ impl BuiltinFunction {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
     name: String,
-    methods: HashMap<String, Rc<Function>>,
+    methods: HashMap<String, Function>,
     line: usize,
 }
 
@@ -133,12 +123,12 @@ impl Display for Class {
 
 impl Class {
     pub fn new(name: impl Into<String>, methods: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
-        let mut methods_map: HashMap<String, Rc<Function>> = HashMap::new();
+        let mut methods_map: HashMap<String, Function> = HashMap::new();
         for method in methods {
             match method {
                 Stmt::Function { name, params, body, line } => {
                     let fcn = Function::new(Some(name.to_string()), &params, &body, *line, env);
-                    methods_map.insert(name.to_string(), Rc::new(fcn));
+                    methods_map.insert(name.to_string(), fcn);
                 }
                 _ => {
                     panic!("Stmt::Class methods may only contain Stmt::Functions");
@@ -153,23 +143,29 @@ impl Class {
         }
     }
 
-    pub fn find_method(&self, name: &str) -> Option<Rc<Function>> {
+    pub fn find_method(&self, name: &str) -> Option<Function> {
         self.methods.get(name).cloned()
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Callable {
-    Function(Rc<Function>),
+    Function(Function),
     Builtin(Rc<BuiltinFunction>),
     Class(Rc<Class>),
+}
+
+impl Debug for Callable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self)
+    }
 }
 
 impl Display for Callable {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Callable::Function(fcn) => {
-                write!(f, "{}", fcn)
+                write!(f, "{}", fcn.declaration)
             }
             Callable::Builtin(fcn) => {
                 write!(f, "{}", fcn)
@@ -184,14 +180,14 @@ impl Display for Callable {
 impl Callable {
     pub fn arity(&self) -> usize {
         match self {
-            Callable::Function(f) => f.params.len(),
+            Callable::Function(f) => f.declaration.params.len(),
             Callable::Builtin(f) => f.arity,
             Callable::Class(_c) => 0, // TODO: support constructors
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Instance {
     class: Rc<Class>,
     fields: HashMap<String, Value>,

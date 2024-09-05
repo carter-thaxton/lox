@@ -184,7 +184,7 @@ impl Interpreter {
 
             Expr::Function { params, body, line } => {
                 let fcn = Function::new(None, params, body, *line, &self.env);
-                let fcn_val = Value::Callable(Callable::Function(Rc::new(fcn)));
+                let fcn_val = Value::Callable(Callable::Function(fcn));
                 Ok(fcn_val)
             }
 
@@ -236,11 +236,11 @@ impl Interpreter {
             Callable::Function(f) => {
                 let orig_env = self.enter(Rc::clone(&f.closure));
 
-                for (i, param) in f.params.iter().enumerate() {
+                for (i, param) in f.declaration.params.iter().enumerate() {
                     self.env.borrow_mut().define(param, args[i].clone());
                 }
 
-                for stmt in &f.body {
+                for stmt in &f.declaration.body {
                     let result = self.execute(&stmt);
 
                     match result {
@@ -356,7 +356,7 @@ impl Interpreter {
 
             Stmt::Function { name, params, body, line } => {
                 let fcn = Function::new(Some(name.to_string()), params, body, *line, &self.env);
-                let fcn_val = Value::Callable(Callable::Function(Rc::new(fcn)));
+                let fcn_val = Value::Callable(Callable::Function(fcn));
 
                 self.env.borrow_mut().define(name, fcn_val);
             }
