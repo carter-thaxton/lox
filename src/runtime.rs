@@ -222,7 +222,6 @@ pub fn set_property(instance: &Rc<RefCell<Instance>>, name: impl Into<String>, v
     instance.borrow_mut().fields.insert(name.into(), value);
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,

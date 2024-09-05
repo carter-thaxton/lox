@@ -133,15 +133,13 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
 
             for method in methods {
                 match method {
-                    Stmt::Function { params, body, .. } => {
-                        match resolve_function(FunctionKind::Method, params, body, scopes) {
-                            Err(err) => {
-                                scopes.pop();
-                                return Err(err);
-                            }
-                            _ => {}
+                    Stmt::Function { params, body, .. } => match resolve_function(FunctionKind::Method, params, body, scopes) {
+                        Err(err) => {
+                            scopes.pop();
+                            return Err(err);
                         }
-                    }
+                        _ => {}
+                    },
                     _ => {
                         panic!("Stmt::Class methods may only contain Stmt::Functions");
                     }
@@ -150,7 +148,7 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
             scopes.pop();
         }
 
-        // below simply walks the AST
+        // simply walk the AST
         Stmt::Expr(expr) => {
             resolve_expr(expr, scopes)?;
         }
@@ -158,7 +156,6 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
             resolve_expr(expr, scopes)?;
         }
         Stmt::Block(stmts) => {
-            // defer?
             scopes.push();
             for stmt in stmts {
                 match resolve_stmt(stmt, scopes) {
@@ -192,7 +189,9 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
             }
         }
 
-        _ => {}
+        // nothing to walk
+        Stmt::Nop | Stmt::Break | Stmt::Continue => {}
+        Stmt::ExpectOutput(_) | Stmt::ExpectRuntimeError(_) => {}
     }
     Ok(())
 }
@@ -238,7 +237,11 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
             if let Some((depth, index)) = scopes.depth_and_index_of("this") {
                 *depth_and_index = Some((depth, index));
             } else {
-                return Err(Error::parser_error_on_line_at_token(*line, "this", "Can't use 'this' outside of a class."));
+                return Err(Error::parser_error_on_line_at_token(
+                    *line,
+                    "this",
+                    "Can't use 'this' outside of a class.",
+                ));
             }
         }
 

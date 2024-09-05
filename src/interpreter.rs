@@ -214,6 +214,18 @@ impl Interpreter {
                 }
             }
 
+            Expr::This { depth_and_index, .. } => {
+                if let Some((depth, index)) = depth_and_index {
+                    if let Some(val) = self.env.borrow().get_at(*depth, *index) {
+                        Ok(val.clone())
+                    } else {
+                        panic!("Undefined 'this' at run-time, which was resolved at compile-time.");
+                    }
+                } else {
+                    panic!("Failed to resolve 'this' at compile-time.");
+                }
+            }
+
             _ => Err(Error::runtime_error("Unexpected expression.")),
         }
     }
@@ -292,6 +304,8 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), Error> {
         match stmt {
+            Stmt::Nop => {}
+
             Stmt::Expr(expr) => {
                 self.evaluate(expr)?;
             }

@@ -4,6 +4,7 @@ pub type Program = Vec<Stmt>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
+    Nop,
     Expr(Box<Expr>),
     Print(Box<Expr>),
     Var {
@@ -88,7 +89,7 @@ pub enum Expr {
     This {
         line: usize,
         depth_and_index: Option<(usize, usize)>,
-    }
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

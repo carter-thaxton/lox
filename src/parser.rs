@@ -168,6 +168,11 @@ impl<'a> Parser<'a> {
             return Ok(stmt);
         }
 
+        // reached end of file on a statement boundary - this can happen with test comments
+        if self.at_eof() {
+            return Ok(Stmt::Nop);
+        }
+
         // if (<cond>) <then> ( else <else> )?
         if self.matches(TokenKind::If).is_some() {
             self.consume(TokenKind::LeftParen, "Expect '(' after 'if'.")?;
@@ -625,6 +630,14 @@ impl<'a> Parser<'a> {
                 TokenKind::Number(val) => return Ok(Expr::Literal(Literal::Number(val))),
                 _ => unreachable!(),
             }
+        }
+
+        // this
+        if let Some(tok) = self.matches(TokenKind::This) {
+            return Ok(Expr::This {
+                line: tok.span.line,
+                depth_and_index: None,
+            });
         }
 
         // <identifier>
