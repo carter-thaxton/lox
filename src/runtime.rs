@@ -63,17 +63,14 @@ impl Function {
         }
     }
 
-    // pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Function {
-    //     let mut env = Environment::new(Rc::clone(&self.closure));
-    //     env.define("this", Value::Instance(instance));
-    //     Function {
-    //         name: self.name.clone(),
-    //         params: self.params.clone(),
-    //         body: self.body.clone(),
-    //         line: self.line,
-    //         closure: Rc::new(env.into()),
-    //     }
-    // }
+    pub fn bind(&self, instance: Rc<RefCell<Instance>>) -> Function {
+        let mut env = Environment::new(Rc::clone(&self.closure));
+        env.define("this", Value::Instance(instance));
+        Function {
+            declaration: self.declaration.clone(),
+            closure: Rc::new(RefCell::new(env)),
+        }
+    }
 }
 
 pub struct BuiltinFunction {
@@ -206,22 +203,25 @@ impl Instance {
             fields: HashMap::new(),
         }
     }
+}
 
-    pub fn get(&self, name: &str) -> Option<Value> {
-        if let Some(val) = self.fields.get(name) {
-            Some(val.clone())
-        } else if let Some(method) = self.class.find_method(name) {
-            // method.bind(self);
-            Some(Value::Callable(Callable::Function(method)))
-        } else {
-            None
-        }
-    }
-
-    pub fn set(&mut self, name: impl Into<String>, value: Value) {
-        self.fields.insert(name.into(), value);
+// this can't be a method on Instance, because it requires access to the whole Rc<RefCell<Instance>> to bind 'this' for methods
+pub fn get_property(instance: &Rc<RefCell<Instance>>, name: &str) -> Option<Value> {
+    if let Some(val) = instance.borrow().fields.get(name) {
+        Some(val.clone())
+    } else if let Some(method) = instance.borrow().class.find_method(name) {
+        let method = method.bind(Rc::clone(instance));
+        Some(Value::Callable(Callable::Function(method)))
+    } else {
+        None
     }
 }
+
+// use a function here for symmetry
+pub fn set_property(instance: &Rc<RefCell<Instance>>, name: impl Into<String>, value: Value) {
+    instance.borrow_mut().fields.insert(name.into(), value);
+}
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

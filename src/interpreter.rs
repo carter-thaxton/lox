@@ -192,7 +192,7 @@ impl Interpreter {
                 let object = self.evaluate(object)?;
                 match object {
                     Value::Instance(instance) => {
-                        if let Some(value) = instance.borrow().get(property) {
+                        if let Some(value) = get_property(&instance, property) {
                             Ok(value.clone())
                         } else {
                             Err(Error::runtime_error(format!("Undefined property '{}'.", property)))
@@ -207,7 +207,7 @@ impl Interpreter {
                 let value = self.evaluate(value)?;
                 match object {
                     Value::Instance(instance) => {
-                        instance.borrow_mut().set(property, value.clone());
+                        set_property(&instance, property, value.clone());
                         Ok(value)
                     }
                     _ => Err(Error::runtime_error("Only instances have fields.")),
