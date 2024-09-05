@@ -266,7 +266,7 @@ impl Interpreter {
                                 if value != Value::Nil {
                                     panic!("Can't return a value from an initializer.  This should be checked at compile-time.");
                                 } else {
-                                    // early return in constructor, return 'this' instead below
+                                    // early return in initializer, return 'this' instead below
                                     break;
                                 }
                             } else {
@@ -285,7 +285,7 @@ impl Interpreter {
                 self.env = orig_env;
 
                 if f.declaration.is_init {
-                    // always return 'this' from constructors
+                    // always return 'this' from initializer
                     let this = f.closure.borrow().get_at(0, 0).expect("'this' not found in environment of initializer.");
                     assert!(matches!(this, Value::Instance(_)), "'this' should refer to an instance - got: {}", this);
                     Ok(this)
@@ -298,10 +298,10 @@ impl Interpreter {
 
             Callable::Class(class) => {
                 if let Some(init) = class.find_method("init") {
+                    assert!(init.declaration.is_init, "Method named 'init' on class should always be recognized as an initializer.");
                     let instance = Instance::new(class);
-                    let init = init.bind(instance.clone());
-                    self.call(Value::Callable(Callable::Function(init)), args)?;
-                    Ok(Value::Instance(instance))
+                    let init = init.bind(instance);
+                    self.call(Value::Callable(Callable::Function(init)), args)  // initializers always returns 'this'
                 } else {
                     let instance = Instance::new(class);
                     Ok(Value::Instance(instance))

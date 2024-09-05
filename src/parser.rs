@@ -10,7 +10,7 @@ use std::iter::Peekable;
 pub enum FunctionKind {
     Function,
     Method,
-    Constructor,
+    Initializer,
 }
 
 impl Display for FunctionKind {
@@ -18,7 +18,7 @@ impl Display for FunctionKind {
         match self {
             FunctionKind::Function => write!(f, "function"),
             FunctionKind::Method => write!(f, "method"),
-            FunctionKind::Constructor => write!(f, "constructor"),
+            FunctionKind::Initializer => write!(f, "initializer"),
         }
     }
 }
@@ -160,9 +160,9 @@ impl<'a> Parser<'a> {
         self.consume(TokenKind::RightParen, "Expect ')' after parameters.")?;
         self.consume(TokenKind::LeftBrace, format!("Expect '{{' before {} body.", kind))?;
 
-        // detect specially-named 'init' method, and parse block as constructor
+        // detect specially-named 'init' method, and parse block as an initializer
         if kind == FunctionKind::Method && name == "init" {
-            kind = FunctionKind::Constructor;
+            kind = FunctionKind::Initializer;
         }
 
         let body = self.parse_block(Some(kind), None)?;
@@ -320,7 +320,7 @@ impl<'a> Parser<'a> {
                 (None, _) => {
                     return Err(Error::parser_error(tok.span, "Can't return from top-level code."));
                 }
-                (Some(FunctionKind::Constructor), Some(_)) => {
+                (Some(FunctionKind::Initializer), Some(_)) => {
                     return Err(Error::parser_error(tok.span, "Can't return a value from an initializer."));
                 }
                 _ => {}

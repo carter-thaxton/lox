@@ -123,7 +123,7 @@ impl Class {
         for method in methods {
             match method {
                 Stmt::Function { name, params, body, line } => {
-                    let is_init = name == "init";  // detect constructor method
+                    let is_init = name == "init";  // detect specially-named 'init' method
                     let fcn = Function::new(Some(name.to_string()), &params, &body, *line, is_init, env);
                     methods_map.insert(name.to_string(), fcn);
                 }
