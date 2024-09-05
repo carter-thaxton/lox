@@ -2,6 +2,7 @@ use crate::ast::*;
 use crate::errors::*;
 use crate::lexer::*;
 use crate::resolver::resolve;
+use std::collections::VecDeque;
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 
@@ -21,6 +22,7 @@ impl Display for FunctionKind {
 
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
+    test_stmts: VecDeque<Stmt>,
     last_line: usize,
 }
 
@@ -33,6 +35,7 @@ impl<'a> Parser<'a> {
     pub fn new(input: &'a str, enable_test_comments: bool) -> Self {
         Parser {
             lexer: Lexer::new(input, enable_test_comments).peekable(),
+            test_stmts: VecDeque::new(),
             last_line: 1,
         }
     }
@@ -47,6 +50,11 @@ impl<'a> Parser<'a> {
         // first pass - parse
         while !self.at_eof() {
             let stmt = self.parse_declaration(false, None)?;
+            program.push(stmt);
+        }
+
+        // handle any final test comments
+        while let Some(stmt) = self.test_stmts.pop_front() {
             program.push(stmt);
         }
 
@@ -65,7 +73,9 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_declaration(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
-        if let Some(stmt) = self.parse_test_comments() {
+        // between each statement, handle any test statements parsed from comments
+        self.advance_over_test_comments();
+        if let Some(stmt) = self.test_stmts.pop_front() {
             return Ok(stmt);
         }
 
@@ -158,14 +168,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stmt(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Stmt, Error> {
+        // between each statement, handle any test statements parsed from comments
+        self.advance_over_test_comments();
+        if let Some(stmt) = self.test_stmts.pop_front() {
+            return Ok(stmt);
+        }
+
         // ;
         while self.matches(TokenKind::Semicolon).is_some() {
             // simply ignore empty statement
-        }
-
-        // expect ...
-        if let Some(stmt) = self.parse_test_comments() {
-            return Ok(stmt);
         }
 
         // reached end of file on a statement boundary - this can happen with test comments
@@ -341,40 +352,20 @@ impl<'a> Parser<'a> {
     fn parse_block(&mut self, in_function: bool, in_loop: Option<LoopContext>) -> Result<Vec<Stmt>, Error> {
         let mut stmts = Vec::new();
         while !self.at_eof() {
-            if let Some(stmt) = self.parse_test_comments() {
+            self.advance_over_test_comments();
+            if let Some(stmt) = self.test_stmts.pop_front() {
                 stmts.push(stmt);
             }
+
             if self.matches(TokenKind::RightBrace).is_some() {
+                // exit the loop with collected statements
                 return Ok(stmts);
             }
+
             let stmt = self.parse_declaration(in_function, in_loop)?;
             stmts.push(stmt);
         }
         return Err(self.parser_error("Expect '}' after block."));
-    }
-
-    fn parse_test_comments(&mut self) -> Option<Stmt> {
-        // == TEST ==
-        // expect: <output value>
-        // expect runtime error: <error message>
-        // Error <parser error>
-        while let Some(tok) = self.matches_p(|t| {
-            matches!(
-                t,
-                TokenKind::ExpectOutput(_) | TokenKind::ExpectParserError(_) | TokenKind::ExpectRuntimeError(_)
-            )
-        }) {
-            match tok.kind {
-                TokenKind::ExpectOutput(txt) => return Some(Stmt::ExpectOutput(txt.to_string())),
-                TokenKind::ExpectRuntimeError(msg) => return Some(Stmt::ExpectRuntimeError(msg.to_string())),
-                TokenKind::ExpectParserError(_msg) => {
-                    // ignore this while parsing...
-                    continue;
-                }
-                _ => unreachable!(),
-            }
-        }
-        None
     }
 
     //
@@ -711,21 +702,11 @@ impl<'a> Parser<'a> {
     // advance ahead to next token, skipping over any test comments, useful for reporting parser errors
     // returns None at EOF
     fn next_span_for_error(&mut self) -> Option<ErrorSpan> {
-        loop {
-            match self.lexer.next() {
-                Some(Ok(token)) if token.kind.is_test() => {
-                    continue;
-                }
-                Some(Ok(token)) if !token.kind.is_test() => {
-                    return Some(token.span.into());
-                }
-                Some(Err(Error { span: Some(span), .. })) => {
-                    return Some(span);
-                }
-                _ => {
-                    return None;
-                }
-            }
+        self.advance_over_test_comments();
+        match self.lexer.next() {
+            Some(Ok(token)) => Some(token.span.into()),
+            Some(Err(Error { span: Some(span), .. })) => Some(span),
+            _ => None,
         }
     }
 
@@ -740,8 +721,31 @@ impl<'a> Parser<'a> {
             .expect("Should not produce a lexer error");
 
         self.last_line = token.span.line;
+        self.advance_over_test_comments();
 
         token
+    }
+
+    // advances over any upcoming test comments, converting them to statements to be included at the top level
+    fn advance_over_test_comments(&mut self) {
+        // == TEST ==
+        // expect: <output value>
+        // expect runtime error: <error message>
+        // Error <parser error>
+        while self.check_p(|t| {
+            matches!(
+                t,
+                TokenKind::ExpectOutput(_) | TokenKind::ExpectRuntimeError(_) | TokenKind::ExpectParserError(_)
+            )
+        }) {
+            let tok = self.lexer.next().unwrap().unwrap();
+            match tok.kind {
+                TokenKind::ExpectOutput(txt) => self.test_stmts.push_back(Stmt::ExpectOutput(txt.to_string())),
+                TokenKind::ExpectRuntimeError(msg) => self.test_stmts.push_back(Stmt::ExpectRuntimeError(msg.to_string())),
+                TokenKind::ExpectParserError(_msg) => {} // ignore this while parsing
+                _ => unreachable!(),
+            }
+        }
     }
 
     // peeks ahead without advancing, to see if the next token matches the given kind
