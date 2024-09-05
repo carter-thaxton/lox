@@ -1,0 +1,17 @@
+
+class Foo {}
+
+fun makeFoo(x) {
+  var result = Foo();
+  result.x = x;
+  return result;
+}
+
+var foo = makeFoo(5);
+foo.foo = makeFoo(6);
+foo.foo.foo = makeFoo(7);
+
+print foo.x; // expect: 5
+print foo.foo.foo.x; // expect: 7
+print foo.foo.x; // expect: 6
+print foo.foo.foo.foo.x; // expect runtime error: Undefined property 'foo'.
