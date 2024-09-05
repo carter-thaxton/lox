@@ -49,10 +49,22 @@ impl Display for Function {
     }
 }
 
+impl Function {
+    pub fn new(name: impl Into<String>, params: &[(String, usize)], body: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
+        Function {
+            name: Some(name.into()),
+            params: params.iter().map(|p| p.0.clone()).collect(),
+            body: body.to_vec(),
+            line: line,
+            closure: Rc::clone(env),
+        }
+    }
+}
+
 pub struct BuiltinFunction {
-    pub name: String,
-    pub arity: usize,
-    pub fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
+    name: String,
+    arity: usize,
+    fcn: Box<dyn Fn(&[Value]) -> Result<Value, Error>>,
 }
 
 impl PartialEq for BuiltinFunction {
@@ -80,12 +92,25 @@ impl Display for BuiltinFunction {
     }
 }
 
+impl BuiltinFunction {
+    pub fn call(&self, args: &[Value]) -> Result<Value, Error> {
+        if args.len() != self.arity {
+            panic!(
+                "Call to builtin function '{}' expected {} arguments but got {}.",
+                self.name,
+                self.arity,
+                args.len()
+            );
+        }
+        (self.fcn)(args)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
-    pub name: String,
-    pub methods: Vec<Stmt>,
-    pub line: usize,
-    // closure?
+    name: String,
+    methods: HashMap<String, Rc<Function>>,
+    line: usize,
 }
 
 impl Display for Class {
@@ -94,10 +119,37 @@ impl Display for Class {
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl Class {
+    pub fn new(name: impl Into<String>, methods: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
+        let mut methods_map: HashMap<String, Rc<Function>> = HashMap::new();
+        for method in methods {
+            match method {
+                Stmt::Function { name, params, body, line } => {
+                    let fcn = Function::new(name, &params, &body, *line, env);
+                    methods_map.insert(name.to_string(), Rc::new(fcn));
+                }
+                _ => {
+                    panic!("Stmt::Class methods may only contain Stmt::Functions");
+                }
+            }
+        }
+
+        Class {
+            name: name.into(),
+            methods: methods_map,
+            line,
+        }
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<Rc<Function>> {
+        self.methods.get(name).cloned()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Callable {
-    Function(Function),
-    Builtin(BuiltinFunction),
+    Function(Rc<Function>),
+    Builtin(Rc<BuiltinFunction>),
     Class(Rc<Class>),
 }
 
@@ -147,8 +199,14 @@ impl Instance {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<&Value> {
-        self.fields.get(name)
+    pub fn get(&self, name: &str) -> Option<Value> {
+        if let Some(val) = self.fields.get(name) {
+            Some(val.clone())
+        } else if let Some(method) = self.class.find_method(name) {
+            Some(Value::Callable(Callable::Function(method)))
+        } else {
+            None
+        }
     }
 
     pub fn set(&mut self, name: impl Into<String>, value: Value) {
@@ -163,7 +221,7 @@ pub enum Value {
     False,
     Number(f64),
     String(String),
-    Callable(Rc<Callable>),
+    Callable(Callable),
     Instance(Rc<RefCell<Instance>>),
 }
 
@@ -239,7 +297,7 @@ impl Value {
             arity,
             fcn,
         };
-        Value::Callable(Rc::new(Callable::Builtin(fcn)))
+        Value::Callable(Callable::Builtin(Rc::new(fcn)))
     }
 }
 

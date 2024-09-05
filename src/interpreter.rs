@@ -190,7 +190,7 @@ impl Interpreter {
                     line: *line,
                     closure: Rc::clone(&self.env),
                 };
-                Ok(Value::Callable(Rc::new(Callable::Function(fcn))))
+                Ok(Value::Callable(Callable::Function(Rc::new(fcn))))
             }
 
             Expr::Get { object, property, .. } => {
@@ -237,7 +237,7 @@ impl Interpreter {
             )));
         }
 
-        match &*callee {
+        match callee {
             Callable::Function(f) => {
                 let orig_env = self.enter(f.closure.clone());
 
@@ -269,10 +269,10 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            Callable::Builtin(f) => Ok((f.fcn)(args)?),
+            Callable::Builtin(f) => f.call(args),
 
             Callable::Class(class) => {
-                let inst = Instance::new(Rc::clone(class));
+                let inst = Instance::new(class);
                 Ok(Value::Instance(Rc::new(RefCell::new(inst))))
             }
         }
@@ -360,27 +360,16 @@ impl Interpreter {
             }
 
             Stmt::Function { name, params, body, line } => {
-                let fcn = Function {
-                    name: Some(name.to_string()),
-                    params: params.iter().map(|p| p.0.clone()).collect(),
-                    body: body.to_vec(),
-                    line: *line,
-                    closure: Rc::clone(&self.env),
-                };
-
-                let fcn_val = Value::Callable(Rc::new(Callable::Function(fcn)));
+                let fcn = Function::new(name, params, body, *line, &self.env);
+                let fcn_val = Value::Callable(Callable::Function(Rc::new(fcn)));
 
                 self.env.borrow_mut().define(name, fcn_val);
             }
 
             Stmt::Class { name, methods, line } => {
-                let class = Class {
-                    name: name.to_string(),
-                    methods: methods.to_vec(),
-                    line: *line,
-                };
-
-                let class_val = Value::Callable(Rc::new(Callable::Class(Rc::new(class))));
+                // TODO: introduce new scope / handle this?
+                let class = Class::new(name, methods, *line, &self.env);
+                let class_val = Value::Callable(Callable::Class(Rc::new(class)));
 
                 self.env.borrow_mut().define(name, class_val);
             }

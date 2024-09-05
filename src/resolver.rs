@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::errors::*;
 use crate::globals::*;
+use crate::parser::FunctionKind;
 use std::collections::HashMap;
 
 struct Scopes<'a>(Vec<HashMap<&'a str, (usize, bool)>>);
@@ -121,11 +122,21 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
         Stmt::Function { name, params, body, line } => {
             scopes.declare_and_check(name, *line)?;
             scopes.define(name);
-            resolve_function(params, body, scopes)?;
+            resolve_function(FunctionKind::Function, params, body, scopes)?;
         }
-        Stmt::Class { name, methods: _, line } => {
+        Stmt::Class { name, methods, line } => {
             scopes.declare_and_check(name, *line)?;
-            // TODO: resolve methods
+
+            for method in methods {
+                match method {
+                    Stmt::Function { params, body, .. } => {
+                        resolve_function(FunctionKind::Method, params, body, scopes)?;
+                    }
+                    _ => {
+                        panic!("Stmt::Class methods may only contain Stmt::Functions");
+                    }
+                }
+            }
         }
 
         // below simply walks the AST
@@ -210,7 +221,7 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
             }
         }
         Expr::Function { params, body, .. } => {
-            resolve_function(params, body, scopes)?;
+            resolve_function(FunctionKind::Function, params, body, scopes)?;
         }
 
         // below simply walks the AST
@@ -243,7 +254,7 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
     Ok(())
 }
 
-fn resolve_function<'a>(params: &'a [(String, usize)], body: &'a mut [Stmt], scopes: &mut Scopes<'a>) -> Result<(), Error> {
+fn resolve_function<'a>(_kind: FunctionKind, params: &'a [(String, usize)], body: &'a mut [Stmt], scopes: &mut Scopes<'a>) -> Result<(), Error> {
     // be sure to pop this before exiting
     // better way to do a 'finally' or 'defer' in rust?
     scopes.push();

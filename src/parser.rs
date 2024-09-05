@@ -5,7 +5,7 @@ use crate::resolver::resolve;
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 
-enum FunctionKind {
+pub enum FunctionKind {
     Function,
     Method,
 }
