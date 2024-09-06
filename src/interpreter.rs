@@ -47,11 +47,10 @@ impl Interpreter {
 
             Expr::Variable { name, depth_and_index, .. } => {
                 if let Some((depth, index)) = depth_and_index {
-                    if let Some(val) = self.env.borrow().get_at(*depth, *index) {
-                        Ok(val.clone())
-                    } else {
+                    let Some(val) = self.env.borrow().get_at(*depth, *index) else {
                         panic!("Undefined variable at run-time, which was resolved at compile-time: {}", name);
-                    }
+                    };
+                    Ok(val.clone())
                 } else if let Some(val) = self.env.borrow().get(name) {
                     // may be a global variable, according to lox rules
                     Ok(val.clone())
@@ -245,6 +244,8 @@ impl Interpreter {
                 };
 
                 if let Some(method) = superclass.find_method(method) {
+                    assert!(*depth > 0, "Depth of 'super' should always be greater than 0.");
+
                     let this_val = self
                         .env
                         .borrow()
@@ -301,15 +302,16 @@ impl Interpreter {
                             if f.declaration.is_init {
                                 if value != Value::Nil {
                                     panic!("Can't return a value from an initializer.  This should be checked at compile-time.");
-                                } else {
-                                    // early return in initializer, return 'this' instead below
-                                    break;
                                 }
+                                // early return in initializer, return 'this' instead below
+                                break;
                             } else {
                                 self.env = orig_env;
                                 return Ok(value);
                             }
                         }
+
+                        // any other error
                         Err(err) => {
                             self.env = orig_env;
                             return Err(err);
