@@ -298,10 +298,13 @@ impl Interpreter {
 
             Callable::Class(class) => {
                 if let Some(init) = class.find_method("init") {
-                    assert!(init.declaration.is_init, "Method named 'init' on class should always be recognized as an initializer.");
+                    assert!(
+                        init.declaration.is_init,
+                        "Method named 'init' on class should always be recognized as an initializer."
+                    );
                     let instance = Instance::new(class);
                     let init = init.bind(instance);
-                    self.call(Value::Callable(Callable::Function(init)), args)  // initializers always returns 'this'
+                    self.call(Value::Callable(Callable::Function(init)), args) // initializers always returns 'this'
                 } else {
                     let instance = Instance::new(class);
                     Ok(Value::Instance(instance))
@@ -400,8 +403,27 @@ impl Interpreter {
                 self.env.borrow_mut().define(name, fcn_val);
             }
 
-            Stmt::Class { name, methods, line } => {
-                let class = Class::new(name, methods, *line, &self.env);
+            Stmt::Class {
+                name,
+                superclass,
+                methods,
+                line,
+            } => {
+                let superclass: Option<Rc<Class>> = if let Some(superclass) = superclass {
+                    let superclass_val = self.evaluate(superclass)?;
+                    match superclass_val {
+                        Value::Callable(Callable::Class(c)) => {
+                            Some(c)
+                        }
+                        _ => {
+                            return Err(Error::runtime_error("Superclass must be a class."));
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                let class = Class::new(name, superclass, methods, *line, &self.env);
                 let class_val = Value::Callable(Callable::Class(Rc::new(class)));
 
                 self.env.borrow_mut().define(name, class_val);

@@ -60,7 +60,7 @@ impl Function {
 
     pub fn bind(&self, instance: Instance) -> Function {
         let mut env = Environment::new(Rc::clone(&self.closure));
-        env.define("this", Value::Instance(instance));  // always at index 0 in new environment
+        env.define("this", Value::Instance(instance)); // always at index 0 in new environment
         Function {
             declaration: self.declaration.clone(),
             closure: Rc::new(RefCell::new(env)),
@@ -107,6 +107,7 @@ impl BuiltinFunction {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
     name: String,
+    superclass: Option<Rc<Class>>,
     methods: HashMap<String, Function>,
     line: usize,
 }
@@ -118,12 +119,12 @@ impl Display for Class {
 }
 
 impl Class {
-    pub fn new(name: impl Into<String>, methods: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
+    pub fn new(name: impl Into<String>, superclass: Option<Rc<Class>>, methods: &[Stmt], line: usize, env: &Rc<RefCell<Environment>>) -> Self {
         let mut methods_map: HashMap<String, Function> = HashMap::new();
         for method in methods {
             match method {
                 Stmt::Function { name, params, body, line } => {
-                    let is_init = name == "init";  // detect specially-named 'init' method
+                    let is_init = name == "init"; // detect specially-named 'init' method
                     let fcn = Function::new(Some(name.to_string()), &params, &body, *line, is_init, env);
                     methods_map.insert(name.to_string(), fcn);
                 }
@@ -135,16 +136,24 @@ impl Class {
 
         Class {
             name: name.into(),
+            superclass,
             methods: methods_map,
             line,
         }
     }
 
     pub fn find_method(&self, name: &str) -> Option<Function> {
-        self.methods.get(name).cloned()
+        if let Some(method) = self.methods.get(name) {
+            Some(method.clone())
+        } else if let Some(superclass) = &self.superclass {
+            superclass.find_method(name)
+        } else {
+            None
+        }
     }
 
     pub fn init_arity(&self) -> usize {
+        // TODO: should this only look at current class, or also at superclass?
         if let Some(init) = self.methods.get("init") {
             init.arity()
         } else {

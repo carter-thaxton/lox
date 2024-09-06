@@ -30,7 +30,8 @@ pub enum Stmt {
     },
     Class {
         name: String,
-        methods: Vec<Stmt>, // all Stmt::Function
+        superclass: Option<Box<Expr>>, // Expr::Variable
+        methods: Vec<Stmt>,            // all Stmt::Function
         line: usize,
     },
     Return(Option<Box<Expr>>),

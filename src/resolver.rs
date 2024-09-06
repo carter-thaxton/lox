@@ -124,9 +124,35 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
             scopes.define(name);
             resolve_function(FunctionKind::Function, params, body, scopes)?;
         }
-        Stmt::Class { name, methods, line } => {
+        Stmt::Class {
+            name,
+            superclass,
+            methods,
+            line,
+        } => {
             scopes.declare_and_check(name, *line)?;
             scopes.define(name);
+
+            // handle superclass
+            if let Some(superclass) = superclass {
+                match superclass.as_ref() {
+                    Expr::Variable {
+                        name: superclass_name, line, ..
+                    } => {
+                        if superclass_name == name {
+                            return Err(Error::parser_error_on_line_at_token(
+                                *line,
+                                superclass_name,
+                                "A class can't inherit from itself.",
+                            ));
+                        }
+                        resolve_expr(superclass, scopes)?;
+                    }
+                    _ => {
+                        panic!("Superclass may only be an Expr::Variable.");
+                    }
+                }
+            }
 
             scopes.push();
             scopes.declare("this");

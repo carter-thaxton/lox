@@ -90,6 +90,19 @@ impl<'a> Parser<'a> {
         // class <name> { ( <method> )* }
         if self.matches(TokenKind::Class).is_some() {
             let (name, tok) = self.consume_identifier("Expect class name.")?;
+
+            // use an Expr::Variable to store superclass
+            let superclass: Option<Box<Expr>> = if self.matches(TokenKind::Less).is_some() {
+                let (name, tok) = self.consume_identifier("Expect superclass name.")?;
+                Some(Box::new(Expr::Variable {
+                    name: name.to_string(),
+                    depth_and_index: None,
+                    line: tok.span.line,
+                }))
+            } else {
+                None
+            };
+
             self.consume(TokenKind::LeftBrace, "Expect '{' before class body.")?;
 
             let mut methods: Vec<Stmt> = vec![];
@@ -103,6 +116,7 @@ impl<'a> Parser<'a> {
             return Ok(Stmt::Class {
                 name: name.to_string(),
                 methods,
+                superclass,
                 line: tok.span.line,
             });
         }
