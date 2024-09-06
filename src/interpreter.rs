@@ -302,8 +302,7 @@ impl Interpreter {
                         init.declaration.is_init,
                         "Method named 'init' on class should always be recognized as an initializer."
                     );
-                    let instance = Instance::new(class);
-                    let init = init.bind(instance);
+                    let init = init.clone().bind(Instance::new(class));
                     self.call(Value::Callable(Callable::Function(init)), args) // initializers always returns 'this'
                 } else {
                     let instance = Instance::new(class);

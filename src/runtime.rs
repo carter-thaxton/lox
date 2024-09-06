@@ -142,9 +142,9 @@ impl Class {
         }
     }
 
-    pub fn find_method(&self, name: &str) -> Option<Function> {
+    pub fn find_method(&self, name: &str) -> Option<&Function> {
         if let Some(method) = self.methods.get(name) {
-            Some(method.clone())
+            Some(method)
         } else if let Some(superclass) = &self.superclass {
             superclass.find_method(name)
         } else {
@@ -153,8 +153,7 @@ impl Class {
     }
 
     pub fn init_arity(&self) -> usize {
-        // TODO: should this only look at current class, or also at superclass?
-        if let Some(init) = self.methods.get("init") {
+        if let Some(init) = self.find_method("init") {
             init.arity()
         } else {
             0
