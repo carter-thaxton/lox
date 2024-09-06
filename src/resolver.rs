@@ -134,7 +134,7 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
             scopes.define(name);
 
             // handle superclass
-            if let Some(superclass) = superclass {
+            let has_superclass = if let Some(superclass) = superclass {
                 match superclass.as_ref() {
                     Expr::Variable {
                         name: superclass_name, line, ..
@@ -147,11 +147,20 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
                             ));
                         }
                         resolve_expr(superclass, scopes)?;
+                        true
                     }
                     _ => {
                         panic!("Superclass may only be an Expr::Variable.");
                     }
                 }
+            } else {
+                false
+            };
+
+            if has_superclass {
+                scopes.push();
+                scopes.declare("super");
+                scopes.define("super");
             }
 
             scopes.push();
@@ -162,6 +171,9 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
                 match method {
                     Stmt::Function { params, body, .. } => match resolve_function(FunctionKind::Method, params, body, scopes) {
                         Err(err) => {
+                            if has_superclass {
+                                scopes.pop();
+                            }
                             scopes.pop();
                             return Err(err);
                         }
@@ -171,6 +183,10 @@ fn resolve_stmt<'a>(stmt: &'a mut Stmt, scopes: &mut Scopes<'a>) -> Result<(), E
                         panic!("Stmt::Class methods may only contain Stmt::Functions");
                     }
                 }
+            }
+
+            if has_superclass {
+                scopes.pop();
             }
             scopes.pop();
         }
@@ -269,6 +285,19 @@ fn resolve_expr<'a>(expr: &'a mut Expr, scopes: &mut Scopes<'a>) -> Result<(), E
                     "this",
                     "Can't use 'this' outside of a class.",
                 ));
+            }
+        }
+        Expr::Super { line, depth_and_index, .. } => {
+            if let Some((depth, index)) = scopes.depth_and_index_of("super") {
+                *depth_and_index = Some((depth, index));
+            } else {
+                let msg = if scopes.depth_and_index_of("this").is_some() {
+                    // if 'this' is declared, then we are in a class
+                    "Can't use 'super' in a class with no superclass."
+                } else {
+                    "Can't use 'super' outside of a class."
+                };
+                return Err(Error::parser_error_on_line_at_token(*line, "super", msg));
             }
         }
 

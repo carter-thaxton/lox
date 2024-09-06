@@ -1,0 +1,13 @@
+
+class Foo {
+  init(junk) {
+    this.y = Foo;
+  }
+
+  x() {
+    return this.y;
+  }
+}
+
+var foo = Foo(5);
+print foo.x(); // expect: Foo

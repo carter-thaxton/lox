@@ -215,15 +215,51 @@ impl Interpreter {
             }
 
             Expr::This { depth_and_index, .. } => {
-                if let Some((depth, index)) = depth_and_index {
-                    assert_eq!(*index, 0, "'this' should always have index 0.");
-                    if let Some(val) = self.env.borrow().get_at(*depth, *index) {
-                        Ok(val.clone())
-                    } else {
-                        panic!("Undefined 'this' at run-time, which was resolved at compile-time.");
-                    }
-                } else {
+                let Some((depth, index)) = depth_and_index else {
                     panic!("Failed to resolve 'this' at compile-time.");
+                };
+
+                assert_eq!(*index, 0, "'this' should always have index 0.");
+
+                let Some(val) = self.env.borrow().get_at(*depth, *index) else {
+                    panic!("Undefined 'this' at run-time, which was resolved at compile-time.");
+                };
+
+                Ok(val.clone())
+            }
+
+            Expr::Super { method, depth_and_index, .. } => {
+                let Some((depth, index)) = depth_and_index else {
+                    panic!("Failed to resolve 'super' at compile-time.");
+                };
+
+                assert_eq!(*index, 0, "'super' should always have index 0.");
+
+                let Some(superclass_val) = self.env.borrow().get_at(*depth, *index) else {
+                    panic!("Undefined 'super' at run-time, which was resolved at compile-time.");
+                };
+
+                let superclass = match superclass_val {
+                    Value::Callable(Callable::Class(superclass)) => superclass,
+                    _ => panic!("'super' should always resolve to a class."),
+                };
+
+                if let Some(method) = superclass.find_method(method) {
+                    let this_val = self
+                        .env
+                        .borrow()
+                        .get_at(depth - 1, 0)
+                        .expect("Superclass should always define 'this' in depth before 'super'");
+
+                    let this = match this_val {
+                        Value::Instance(this) => this,
+                        _ => panic!("'this' should always be an instance."),
+                    };
+
+                    let result = method.bind(this);
+                    Ok(Value::Callable(Callable::Function(result)))
+                } else {
+                    Err(Error::runtime_error(format!("Undefined property '{}'.", method)))
                 }
             }
 
@@ -408,12 +444,13 @@ impl Interpreter {
                 methods,
                 line,
             } => {
+                // ensure class name is defined in current scope
+                self.env.borrow_mut().define(name, Value::Nil);
+
                 let superclass: Option<Rc<Class>> = if let Some(superclass) = superclass {
                     let superclass_val = self.evaluate(superclass)?;
                     match superclass_val {
-                        Value::Callable(Callable::Class(c)) => {
-                            Some(c)
-                        }
+                        Value::Callable(Callable::Class(c)) => Some(c),
                         _ => {
                             return Err(Error::runtime_error("Superclass must be a class."));
                         }
@@ -422,8 +459,22 @@ impl Interpreter {
                     None
                 };
 
+                // optionally enter a new scope for superclasses, and provide the environment to return to
+                let orig_env = if let Some(ref superclass) = superclass {
+                    let orig_env = self.enter(Rc::clone(&self.env));
+                    let superclass_val = Value::Callable(Callable::Class(Rc::clone(superclass)));
+                    self.env.borrow_mut().define("super", superclass_val);
+                    Some(orig_env)
+                } else {
+                    None
+                };
+
                 let class = Class::new(name, superclass, methods, *line, &self.env);
                 let class_val = Value::Callable(Callable::Class(Rc::new(class)));
+
+                if let Some(orig_env) = orig_env {
+                    self.env = orig_env;
+                }
 
                 self.env.borrow_mut().define(name, class_val);
             }

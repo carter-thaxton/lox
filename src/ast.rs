@@ -91,6 +91,11 @@ pub enum Expr {
         line: usize,
         depth_and_index: Option<(usize, usize)>,
     },
+    Super {
+        method: String,
+        line: usize,
+        depth_and_index: Option<(usize, usize)>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -163,6 +168,9 @@ impl Display for Expr {
             }
             Expr::This { .. } => {
                 write!(f, "(this)")
+            }
+            Expr::Super { method, .. } => {
+                write!(f, "(super {})", method)
             }
         }
     }

@@ -661,6 +661,17 @@ impl<'a> Parser<'a> {
             });
         }
 
+        // super . <method>
+        if let Some(tok) = self.matches(TokenKind::Super) {
+            self.consume(TokenKind::Dot, "Expect '.' after 'super'.")?;
+            let (method, _tok) = self.consume_identifier("Expect superclass method name.")?;
+            return Ok(Expr::Super {
+                method: method.to_string(),
+                line: tok.span.line,
+                depth_and_index: None,
+            });
+        }
+
         // <identifier>
         if let Some((name, tok)) = self.matches_identifier() {
             return Ok(Expr::Variable {
