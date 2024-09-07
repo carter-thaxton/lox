@@ -297,6 +297,7 @@ impl<'a> Iterator for Lexer<'a> {
                 }
                 '/' => {
                     if self.peek() == Some('/') {
+                        // advance to end of line
                         while let Some(c) = self.advance() {
                             if c == '\n' {
                                 break;
@@ -323,11 +324,12 @@ impl<'a> Iterator for Lexer<'a> {
                                 let txt = comment.strip_prefix("// ").unwrap();
                                 (TokenKind::ExpectParserError(Cow::Borrowed(txt)), span)
                             } else {
-                                // normal comment
-                                continue; // ignore, and restart next lexeme
+                                // ignore normal comment
+                                continue;
                             }
                         } else {
-                            continue; // ignore, and restart next lexeme
+                            // ignore all comments, including test comments
+                            continue;
                         }
                     } else {
                         (TokenKind::Slash, self.end_lexeme())
