@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::errors::*;
+use crate::globals::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
@@ -59,11 +60,11 @@ impl Function {
     }
 
     pub fn bind(&self, instance: Instance) -> Function {
-        let mut env = Environment::new(Rc::clone(&self.closure));
-        env.define("this", Value::Instance(instance)); // always at index 0 in new environment
+        let closure = Environment::new(Rc::clone(&self.closure));
+        closure.borrow_mut().define("this", Value::Instance(instance)); // always at index 0 in new environment
         Function {
             declaration: self.declaration.clone(),
-            closure: Rc::new(RefCell::new(env)),
+            closure,
         }
     }
 
@@ -338,20 +339,24 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn global() -> Self {
-        Environment {
+    pub fn global() -> Rc<RefCell<Environment>> {
+        let mut env = Environment {
             values: vec![],
             by_name: HashMap::new(),
             parent: None,
-        }
+        };
+
+        define_globals(&mut env);
+
+        Rc::new(RefCell::new(env))
     }
 
-    pub fn new(parent: Rc<RefCell<Environment>>) -> Self {
-        Environment {
+    pub fn new(parent: Rc<RefCell<Environment>>) -> Rc<RefCell<Environment>> {
+        Rc::new(RefCell::new(Environment {
             values: vec![],
             by_name: HashMap::new(),
             parent: Some(Rc::clone(&parent)),
-        }
+        }))
     }
 
     pub fn get(&self, name: &str) -> Option<Value> {

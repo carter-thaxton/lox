@@ -1,6 +1,5 @@
 use crate::ast::*;
 use crate::errors::*;
-use crate::globals::*;
 use crate::runtime::*;
 use colored::Colorize;
 use std::cell::RefCell;
@@ -15,12 +14,13 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new(test: bool) -> Self {
-        let mut env = Environment::global();
+        let env = Environment::global();
 
-        define_globals(&mut env);
+        // wrap globals in a new scope, to match depth/index from resolver, which doesn't know about built-in globals
+        let env = Environment::new(env);
 
         Interpreter {
-            env: Rc::new(RefCell::new(env)),
+            env,
             test,
             test_output: VecDeque::new(),
         }
@@ -514,7 +514,7 @@ impl Interpreter {
 
     fn enter(&mut self, env: Rc<RefCell<Environment>>) -> Rc<RefCell<Environment>> {
         let orig_env = Rc::clone(&self.env);
-        self.env = Rc::new(RefCell::new(Environment::new(env)));
+        self.env = Environment::new(env);
         orig_env
     }
 

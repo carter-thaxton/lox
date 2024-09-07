@@ -5,10 +5,6 @@ fn clock(start_time: &Instant) -> f64 {
     Instant::now().duration_since(*start_time).as_secs_f64()
 }
 
-pub fn global_names() -> Vec<&'static str> {
-    vec!["clock"]
-}
-
 pub fn define_globals(env: &mut Environment) {
     // built-in globals
     let start_time = Instant::now();

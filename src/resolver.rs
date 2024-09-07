@@ -1,6 +1,5 @@
 use crate::ast::*;
 use crate::errors::*;
-use crate::globals::*;
 use crate::parser::FunctionKind;
 use std::collections::HashMap;
 
@@ -97,10 +96,6 @@ impl<'a> Scopes<'a> {
 //
 pub fn resolve(program: &mut Program) -> Result<(), Error> {
     let mut scopes = Scopes::new();
-
-    for name in global_names() {
-        scopes.declare(name);
-    }
 
     for stmt in program {
         resolve_stmt(stmt, &mut scopes)?;
