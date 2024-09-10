@@ -13,6 +13,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   esac;
 done
 
+# default arg is test directory
+[ $# -eq 0 ] && set -- test
+
 PASS=0
 FAIL=0
 for arg in "$@"; do
@@ -34,7 +37,7 @@ for arg in "$@"; do
       fi
       ((FAIL++))
     fi
-  done < <(find $arg -type f)
+  done < <(find "$arg" -type f -name '*.lox')
 done
 
 echo
