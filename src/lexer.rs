@@ -125,7 +125,7 @@ impl TokenKind<'_> {
         }
     }
 
-    pub fn value(&self) -> Cow<str> {
+    pub fn value(&'_ self) -> Cow<'_, str> {
         match self {
             TokenKind::Number(val) => {
                 if *val == val.trunc() && !val.is_infinite() && !val.is_nan() {

@@ -220,7 +220,7 @@ fn test(input: &str) {
     }
 }
 
-fn get_expected_test_errors(input: &str) -> (Vec<Cow<str>>, Vec<&str>) {
+fn get_expected_test_errors(input: &str) -> (Vec<Cow<'_, str>>, Vec<&str>) {
     let lexer = Lexer::new(input, true);
     let mut parser_errors: Vec<Cow<str>> = vec![];
     let mut runtime_errors: Vec<&str> = vec![];

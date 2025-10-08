@@ -244,7 +244,7 @@ impl Error {
         }
     }
 
-    fn at_message(&self) -> Cow<str> {
+    fn at_message(&self) -> Cow<'_, str> {
         let span: &ErrorSpan = match &self.kind {
             ErrorKind::ParserError(_) => &self.span.as_ref().expect("ParserError should have a span"),
             _ => {
